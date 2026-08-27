@@ -49,3 +49,6 @@ AstaWeb/server_console.log
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# scorciatoie locali di avvio (non fanno parte del prodotto)
+*.lnk
