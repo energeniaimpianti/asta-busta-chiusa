@@ -14,6 +14,15 @@ Decomprimi questa cartella dove vuoi (es. in Documenti).
 Dentro trovi: il programma (cartella "server"), la lista giocatori (cartella "liste")
 e i pulsanti di avvio.
 
+LA VOCE (da fare una volta, 1 minuto)
+------------------------------------
+Per la voce MIGLIORE apri la pagina del banditore con MICROSOFT EDGE
+(gia' installato su ogni Windows: e' il browser con la spirale blu).
+Nella pagina, sotto il nome della lega, trovi la barra "Voce":
+- scegli dal menu' una voce "Online (Natural)" (es. Elsa o Giuseppe)
+- regola la Velocita' (consigliato 0.9) e premi "Prova" finche' ti piace
+- la scelta resta salvata: rifalla solo se cambi computer.
+
 LA SERA DELL'ASTA (2 minuti)
 ----------------------------
 1. Doppio click su  avvia-asta.bat

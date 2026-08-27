@@ -47,6 +47,9 @@
   .toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#3b1d1d; color:#ffd7d7; padding:12px 18px; border-radius:12px; display:none; z-index:9; max-width:90%; }
   .lista-iscritti .avatar { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #22334a; }
   .qr { background:#fff; padding:12px; border-radius:12px; display:inline-block; }
+  select#voce-select { background:#101a28; color:var(--testo); border:1px solid #2b3b50; border-radius:8px; padding:7px 9px; max-width:360px; font-size:13px; }
+  input[type=range]#voce-velocita { accent-color: var(--blu); width:130px; }
+  .barra-voce { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 12px; background:#13203133; border:1px solid #1e3246; border-radius:12px; margin:8px 0; font-size:13px; }
   .indirizzo { font-size:22px; font-weight:800; color:var(--giallo); word-break:break-all; }
   table.squadre { width:100%; border-collapse:collapse; font-size:14px; }
   table.squadre td, table.squadre th { padding:4px 6px; border-bottom:1px solid #22334a; text-align:left; }
@@ -68,6 +71,57 @@ let vista = null;
 let es = null;
 let esitoLista = null;
 let cfg = null;
+
+// ---- VOCE: selezione della miglior voce italiana disponibile + regolazione utente ----
+function vociItaliane() {
+  try {
+    return (window.speechSynthesis ? speechSynthesis.getVoices() : [])
+      .filter((v) => (v.lang || "").toLowerCase().startsWith("it"));
+  } catch (_) { return []; }
+}
+function ordinaVociPerQualita(vs) {
+  // preferite: neurali/online di Edge (Microsoft ... Online (Natural)), poi Google, poi le altre
+  const punteggio = (v) => {
+    const n = v.name.toLowerCase();
+    let p = 0;
+    if (/online/.test(n) && /natural/.test(n)) p += 100;
+    if (/google/.test(n)) p += 50;
+    if (/elsa|isabella|giuseppe|cosimo/.test(n) && !/online/.test(n)) p += 10;
+    return p;
+  };
+  return [...vs].sort((a, b) => punteggio(b) - punteggio(a));
+}
+function voceScelta() {
+  const vs = vociItaliane();
+  const nomeSalvato = localStorage.getItem("asta_voce");
+  return vs.find((v) => v.name === nomeSalvato) || ordinaVociPerQualita(vs)[0] || null;
+}
+function velocitaVoce() {
+  const v = parseFloat(localStorage.getItem("asta_vel") || "");
+  return Number.isFinite(v) ? Math.min(1.15, Math.max(0.6, v)) : 0.9;
+}
+function popolaVoci() {
+  const sel = document.getElementById("voce-select");
+  if (!sel || !window.speechSynthesis) return;
+  const vs = ordinaVociPerQualita(vociItaliane());
+  const attuale = voceScelta();
+  sel.innerHTML = vs.length
+    ? vs.map((v) => `<option value="${v.name}" ${attuale && v.name === attuale.name ? "selected" : ""}>${v.name}</option>`).join("")
+    : `<option value="">(nessuna voce italiana trovata)</option>`;
+}
+if (window.speechSynthesis) {
+  speechSynthesis.onvoiceschanged = popolaVoci;
+  setTimeout(popolaVoci, 300);
+}
+function barraVoce() {
+  return `<div class="barra-voce">🎙 <label for="voce-select">Voce</label>
+    <select id="voce-select"></select>
+    <label for="voce-velocita">Velocità</label>
+    <input type="range" id="voce-velocita" min="0.6" max="1.15" step="0.05" value="${velocitaVoce()}">
+    <button class="btn btn-scuro" id="prova-voce" style="padding:6px 12px;font-size:13px">Prova 🔊</button>
+    <span class="muto">consigliato: apri questa pagina in Microsoft Edge per le voci naturali</span>
+  </div>`;
+}
 
 function toast(msg) {
   const t = document.getElementById("toast");
@@ -120,7 +174,7 @@ function render() {
   if (!vista) return;
   if (vista.preAvvio) { $app.innerHTML = schermataSetup(); wiringSetup(); return; }
   if (vista.fase === "FINE") { $app.innerHTML = schermataFine(); return; }
-  let html = intestazione();
+  let html = intestazione() + barraVoce();
   html += (vista.fase === "RIVELAZIONE") ? pannelloRivelazione() : (pannelloGiocatore() + pannelloPartecipanti() + pannelloAzioni());
   html += `<details><summary>📋 Squadre (aggiornate in tempo reale)</summary>${tabellaSquadre()}</details>`;
   $app.innerHTML = html;
@@ -356,11 +410,18 @@ function parla(testo) {
     const synth = window.speechSynthesis;
     if (!synth) { toast("Voce non disponibile su questo browser"); return; }
     synth.cancel();
-    const u = new SpeechSynthesisUtterance(testo);
-    u.lang = "it-IT"; u.rate = 0.95;
-    const voci = synth.getVoices().filter((v) => v.lang && v.lang.toLowerCase().startsWith("it"));
-    if (voci.length) u.voice = voci[0];
-    synth.speak(u);
+    const voce = voceScelta();
+    const vel = velocitaVoce();
+    // fraseggio: ogni frase un'iterazione a se (pause naturali tra le offerte)
+    const frasi = String(testo).split(/(?<=[.!?:])\s+/).filter((f) => f.trim());
+    (frasi.length ? frasi : [testo]).forEach((frase) => {
+      const u = new SpeechSynthesisUtterance(frase.trim());
+      u.lang = "it-IT";
+      u.rate = vel;
+      u.pitch = 1;
+      if (voce) u.voice = voce;
+      synth.speak(u); // coda automatica
+    });
   } catch (_) { toast("Voce non disponibile"); }
 }
 
@@ -396,7 +457,7 @@ function tabellaSquadre() {
 }
 
 function schermataFine() {
-  return `${intestazione()}
+  return `${intestazione()}${barraVoce()}
   <div class="card centro"><div style="font-size:48px">🏁</div><h1 style="margin:4px 0">Asta conclusa</h1>
     <p class="muto">${esc(vista.config.nomeLega)}</p>
     <a class="btn btn-verde btn-grande" style="display:block;text-decoration:none;margin-top:10px" href="/api/esporta.csv?pin=${encodeURIComponent(pin)}">📤 Scarica CSV delle squadre</a>
@@ -408,9 +469,16 @@ function schermataFine() {
 
 // ------------------------------------------------------------------ eventi
 
+document.addEventListener("change", (e) => {
+  if (e.target && e.target.id === "voce-select") localStorage.setItem("asta_voce", e.target.value);
+});
+document.addEventListener("input", (e) => {
+  if (e.target && e.target.id === "voce-velocita") localStorage.setItem("asta_vel", e.target.value);
+});
 document.addEventListener("click", async (e) => {
   const t = e.target.closest("button, a.btn");
   if (!t) return;
+  if (t.id === "prova-voce") { parla("Asta chiusa per Lautaro Martinez. Bruno ha offerto venti. Aggiudicato a Bruno per venti fantamilioni!"); return; }
   if (t.id === "vai") {
     const v = document.getElementById("pin").value.trim();
     if (v.length !== 4) { toast("PIN a 4 cifre dalla finestra del server"); return; }
