@@ -21,6 +21,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const zlib = require("zlib");
+const { generaXlsx } = require("./esporta-xlsx.js");
 const crypto = require("crypto");
 
 // ============================================================ MOTORE DI REGOLE
@@ -1038,6 +1039,21 @@ function creaServer(opzioni = {}) {
         "Content-Disposition": 'attachment; filename="asta_squadre.csv"',
       });
       res.end(esportaCsvDaStato(sessione.motore.stato), "utf8");
+      return;
+    }
+
+    if (req.method === "GET" && p === "/api/esporta.xlsx") {
+      if (u.searchParams.get("pin") !== sessione.pin) return json(res, 403, { errore: "PIN banditore errato" });
+      try {
+        const xlsxBuf = generaXlsx(sessione.motore.stato);
+        res.writeHead(200, {
+          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": 'attachment; filename="asta_completa.xlsx"',
+        });
+        res.end(xlsxBuf);
+      } catch (e) {
+        json(res, 500, { errore: "Generazione Excel fallita: " + e.message });
+      }
       return;
     }
 

@@ -460,7 +460,9 @@ function schermataFine() {
   return `${intestazione()}${barraVoce()}
   <div class="card centro"><div style="font-size:48px">🏁</div><h1 style="margin:4px 0">Asta conclusa</h1>
     <p class="muto">${esc(vista.config.nomeLega)}</p>
-    <a class="btn btn-verde btn-grande" style="display:block;text-decoration:none;margin-top:10px" href="/api/esporta.csv?pin=${encodeURIComponent(pin)}">📤 Scarica CSV delle squadre</a>
+    <a class="btn btn-verde btn-grande" style="display:block;text-decoration:none;margin-top:10px;font-size:20px" href="/api/esporta.xlsx?pin=${encodeURIComponent(pin)}">📊 SCARICA EXCEL COMPLETO (5 fogli)</a>
+    <p class="muto" style="margin:6px 0">Squadre · Riepilogo · Asta completa · Analisi strategica · Svincolati</p>
+    <a class="btn btn-scuro" style="display:block;text-decoration:none;margin-top:6px;padding:10px;font-size:13px" href="/api/esporta.csv?pin=${encodeURIComponent(pin)}">📄 Oppure scarica solo CSV</a>
     <div style="height:10px"></div>
     <button class="btn btn-rosso btn-grande" id="nuova">🆕 Nuova asta (cancella tutto)</button>
   </div>
