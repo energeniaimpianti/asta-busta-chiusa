@@ -104,3 +104,10 @@ Nuove lezioni si AGGIUNGONO in fondo, mai si cancellano.
   4 scorciatoie: l'output diceva creato, il filesystem diceva altro.
 - **REGOLA**: dopo ogni azione automatizzata, una verifica INDIPENDENTE dall'output
   dell'azione stessa (ls, query, API). "Ha detto OK" non è "è fatto".
+
+## 13 · Ricontrollare i NUMERI nelle comunicazioni
+
+- **Sintomo**: email al banditore con "7 partecipanti" invece di 8 (il numero esatto è nella SPEC dall'inizio).
+- **Causa**: distrazione nel comporre il testo, nessun controllo incrociato con la fonte.
+- **REGOLA**: prima di ogni comunicazione esterna, ricontrollare i numeri (partecipanti, quote, budget)
+  contro SPEC.md. I numeri sbagliati in una email fanno piu' danni dei bug nel codice.
