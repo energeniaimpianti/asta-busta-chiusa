@@ -52,3 +52,5 @@ desktop.ini
 
 # scorciatoie locali di avvio (non fanno parte del prodotto)
 *.lnk
+.tools/sonda-qr.js
+.tools/zip-banditore/
