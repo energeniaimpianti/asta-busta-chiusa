@@ -109,42 +109,70 @@ test("reparto pieno esclude dalle puntate", () => {
   assert.strictEqual(m.offri(1, 5).ok, false);
 });
 
-test("pareggio al massimo apre spareggio ristretto da pari+1", () => {
+test("pareggio apre spareggio: no ritiro, min=propria offerta", () => {
   const m = new MotoreAsta();
   m.avvia(cfgStd(), parts8(), listaStd());
   m.offri(1, 5); m.offri(2, 20); m.offri(3, 0); m.offri(4, 7); m.offri(5, 20);
   for (let i = 6; i <= 8; i++) m.offri(i, 0);
   assert.strictEqual(m.stato.fase, "SPAREGGIO");
   assert.deepStrictEqual(m.stato.candidatiSpareggio.sort(), [2, 5]);
-  assert.strictEqual(m.offri(2, 20).ok, false);        // sotto pari+1
-  assert.strictEqual(m.offri(2, 21).ok, true);
-  assert.strictEqual(m.offri(5, 0).ok, true);          // ritiro
+  assert.strictEqual(m.stato.pareggioOriginale, 20);
+  assert.strictEqual(m.offri(2, 0).ok, false);           // no ritiro
+  assert.strictEqual(m.offri(2, 19).ok, false);          // sotto la propria offerta
+  assert.strictEqual(m.offri(2, 20).ok, true);           // uguale alla propria: ok
+  assert.strictEqual(m.offri(5, 25).ok, true);
   const r = m.stato.rivelazione;
-  assert.strictEqual(r.vincitore, "P2");
-  assert.strictEqual(r.importoFinale, 21);
-  assert.strictEqual(r.spareggi, 1);
-  assert.strictEqual(m.stato.squadre[2].budgetResiduo, 479);
+  assert.strictEqual(r.vincitore, "P5");
+  assert.strictEqual(r.importoFinale, 25);
+  assert.strictEqual(m.stato.squadre[5].budgetResiduo, 475);
 });
 
-test("spareggio con tutti ritirati: non venduto, reinserito una sola volta", () => {
+test("spareggio stesso importo dell'originale: SORTEGGIO (monetina)", () => {
   const m = new MotoreAsta();
   m.avvia(cfgStd(), parts8(), listaStd());
   m.offri(1, 20); m.offri(2, 20);
   for (let i = 3; i <= 8; i++) m.offri(i, 0);
   assert.strictEqual(m.stato.fase, "SPAREGGIO");
-  m.offri(1, 0); m.offri(2, 0);
-  assert.strictEqual(m.stato.rivelazione.nonVenduto, true);
-  m.prossimo();
-  assert.strictEqual(m.corrente.nome, "Attaccante Due");
-  m.forzaChiusura(); m.prossimo();
-  assert.strictEqual(m.corrente.nome, "Attaccante Uno"); // reinserito
-  m.forzaChiusura();                                      // già reinserito → definitivo
-  assert.strictEqual(m.stato.rivelazione.nonVenduto, true);
-  m.prossimo();
-  assert.strictEqual(m.corrente.nome, "Attaccante Due");
-  m.forzaChiusura();
-  m.prossimo();
-  assert.strictEqual(m.corrente.nome, "Centrocampista Uno");
+  m.offri(1, 20); m.offri(2, 20);
+  const r = m.stato.rivelazione;
+  assert.strictEqual(m.stato.fase, "RIVELAZIONE");
+  assert.strictEqual(r.sorteggiato, true);
+  assert.strictEqual(r.importoFinale, 20);
+  assert.ok(r.vincitore === "P1" || r.vincitore === "P2");
+  const vincitoreId = r.idVincitore;
+  assert.strictEqual(m.stato.squadre[vincitoreId].rosa.length, 1);
+  assert.strictEqual(m.stato.squadre[vincitoreId].budgetResiduo, 480);
+  const t = testoAnnuncio(r);
+  assert.ok(t.includes("sorteggiato"), "annuncio deve dire sorteggiato");
+});
+
+test("spareggio a importo superiore apre il SECONDO spareggio (ultimo)", () => {
+  const m = new MotoreAsta();
+  m.avvia(cfgStd(), parts8(), listaStd());
+  m.offri(1, 20); m.offri(2, 20);
+  for (let i = 3; i <= 8; i++) m.offri(i, 0);
+  m.offri(1, 25); m.offri(2, 25);
+  assert.strictEqual(m.stato.fase, "SPAREGGIO");
+  assert.strictEqual(m.stato.spareggi, 2);
+  m.offri(1, 30); m.offri(2, 28);
+  const r = m.stato.rivelazione;
+  assert.strictEqual(r.vincitore, "P1");
+  assert.strictEqual(r.importoFinale, 30);
+  assert.strictEqual(r.sorteggiato, false);
+});
+
+test("spareggio 2 finito in parita: SORTEGGIO", () => {
+  const m = new MotoreAsta();
+  m.avvia(cfgStd(), parts8(), listaStd());
+  m.offri(1, 20); m.offri(2, 20);
+  for (let i = 3; i <= 8; i++) m.offri(i, 0);
+  m.offri(1, 25); m.offri(2, 25);
+  assert.strictEqual(m.stato.spareggi, 2);
+  m.offri(1, 28); m.offri(2, 28);
+  const r = m.stato.rivelazione;
+  assert.strictEqual(r.sorteggiato, true);
+  assert.strictEqual(r.importoFinale, 28);
+  assert.ok(r.vincitore === "P1" || r.vincitore === "P2");
 });
 
 test("forza chiusura del banditore: i mancanti fanno passo", () => {
@@ -640,12 +668,12 @@ test("server: forza chiusura con buste mancanti e spareggio via API", async () =
     const vb = await primaVistaSse(porta, "pin=" + pin);
     assert.strictEqual(vb.fase, "SPAREGGIO");
     assert.strictEqual(vb.spareggio.pari, 20);
-    // Gamma ritirato implicito; Alfa rilancia 21, Beta si ritira
+    // spareggio: Alfa rilancia 21, Beta rilancia 22 (no ritiro, min=propria offerta 20)
     await chiama(porta, "/api/offerta", "POST", JSON.stringify({ pid: 1, token: tA, importo: 21 }));
-    await chiama(porta, "/api/offerta", "POST", JSON.stringify({ pid: 2, token: tB, importo: 0 }));
+    await chiama(porta, "/api/offerta", "POST", JSON.stringify({ pid: 2, token: tB, importo: 22 }));
     const vb2 = await primaVistaSse(porta, "pin=" + pin);
-    assert.strictEqual(vb2.rivelazione.vincitore, "Alfa");
-    assert.strictEqual(vb2.rivelazione.importoFinale, 21);
+    assert.strictEqual(vb2.rivelazione.vincitore, "Beta");
+    assert.strictEqual(vb2.rivelazione.importoFinale, 22);
     assert.strictEqual(vb2.rivelazione.spareggi, 1);
   } finally {
     if (server.closeAllConnections) server.closeAllConnections();

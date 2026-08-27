@@ -103,6 +103,7 @@ class MotoreAsta {
       offerteRoundPrincipale: {},
       ultimoSpareggio: {},
       spareggi: 0,
+    pareggioOriginale: 0,
       squadre,
       nonVenduti: [],
       reinsertioni: {},
@@ -209,10 +210,15 @@ class MotoreAsta {
     if (inSpareggio && !s.candidatiSpareggio.includes(pid)) return { ok: false, errore: "Non candidato allo spareggio" };
     if (!inSpareggio && !this.idonei().some((p) => p.id === pid)) return { ok: false, errore: "Partecipante non idoneo per questo reparto" };
     if (pid in s.offerte) return { ok: false, errore: "Offerta già registrata" };
-    const min = inSpareggio ? this._minSpareggio(this._pariCorrente()) : this.minOffertaCorrente();
+    const min = inSpareggio
+      ? (s.spareggi >= 2 ? (s.ultimoSpareggio[pid] || 1) : (s.offerteRoundPrincipale[pid] || 1))
+      : this.minOffertaCorrente();
     const max = this.maxOfferta(pid);
     const n = Number(importo);
     if (!Number.isInteger(n)) return { ok: false, errore: "Importo non valido" };
+    if (inSpareggio && n === 0) {
+      return { ok: false, errore: "Nello spareggio non ci si può ritirare: offri almeno " + min };
+    }
     if (n !== 0) {
       if (n < min) return { ok: false, errore: `Offerta minima: ${min}` };
       if (n > max) return { ok: false, errore: `Offerta massima: ${max}` };
@@ -228,7 +234,16 @@ class MotoreAsta {
     if (s.fase !== FASI.ATTESA && s.fase !== FASI.SPAREGGIO) return { ok: false, errore: "Fase non valida per la chiusura" };
     const mancanti = this.interrogabili().map((p) => p.id);
     if (mancanti.length > 0) {
-      for (const pid of mancanti) s.offerte[pid] = 0;
+      for (const pid of mancanti) {
+        if (s.fase === FASI.SPAREGGIO) {
+          // in spareggio i mancanti restano alla propria ultima offerta (mai 0)
+          s.offerte[pid] = s.spareggi >= 2
+            ? (s.ultimoSpareggio[pid] || 1)
+            : (s.offerteRoundPrincipale[pid] || 1);
+        } else {
+          s.offerte[pid] = 0; // nell'asta principale i mancanti fanno passo
+        }
+      }
       this._evento("ChiusuraForzata", { roundId: s.roundId });
     }
     this._risolvi();
@@ -260,6 +275,7 @@ class MotoreAsta {
       if (vincenti.length === 1) this._aggiudica(g, vincenti[0], maxV, s.offerte, {});
       else {
         s.fase = FASI.SPAREGGIO;
+        s.pareggioOriginale = maxV;
         s.candidatiSpareggio = vincenti;
         s.offerteRoundPrincipale = { ...s.offerte };
         s.ultimoSpareggio = {};
@@ -267,18 +283,42 @@ class MotoreAsta {
         s.spareggi = 1;
       }
     } else if (s.fase === FASI.SPAREGGIO) {
-      const attive = Object.entries(s.offerte).filter(([, v]) => v > 0);
-      if (attive.length === 0) { this._nonVenduto(g, "tutti ritirati allo spareggio", true, s.offerteRoundPrincipale); return; }
-      const maxV = Math.max(...attive.map(([, v]) => v));
-      const vincenti = attive.filter(([, v]) => v === maxV).map(([k]) => Number(k));
-      if (vincenti.length === 1) this._aggiudica(g, vincenti[0], maxV, s.offerteRoundPrincipale, { ...s.offerte });
-      else {
-        s.candidatiSpareggio = vincenti;
-        s.ultimoSpareggio = { ...s.offerte };
-        s.offerte = {};
-        s.spareggi += 1;
+      // NUOVE REGOLE SPAREGGIO (27/08/2026): mai ritiro, max 2 round, sorteggio
+      const maxV = Math.max(...Object.values(s.offerte));
+      const vincenti = Object.entries(s.offerte).filter(([, v]) => v === maxV).map(([k]) => Number(k));
+      if (vincenti.length === 1) {
+        this._aggiudica(g, vincenti[0], maxV, s.offerteRoundPrincipale, { ...s.offerte });
+      } else if (s.spareggi >= 2) {
+        this._sorteggia(g, vincenti, maxV);
+      } else if (maxV === s.pareggioOriginale) {
+        this._sorteggia(g, vincenti, maxV);
+      } else {
+        this._apriSpareggioSuccessivo(g, vincenti);
       }
     }
+  }
+
+  _apriSpareggioSuccessivo(g, idCandidati) {
+    const s = this.stato;
+    s.candidatiSpareggio = idCandidati;
+    s.ultimoSpareggio = { ...s.offerte };
+    s.offerte = {};
+    s.spareggi += 1;
+  }
+
+  _sorteggia(g, idCandidati, importo) {
+    const s = this.stato;
+    const rng = s.config.seed ? rngConSeed(s.config.seed + s.roundId * 31 + s.spareggi) : Math.random;
+    const vincitore = idCandidati[Math.floor(rng() * idCandidati.length)];
+    const sq = s.squadre[vincitore];
+    sq.budgetResiduo -= importo;
+    sq.rosa.push({ idGiocatore: g.id, importo });
+    const evento = { roundId: s.roundId, idGiocatore: g.id, idPartecipante: vincitore, importo, spareggi: s.spareggi };
+    s.fase = FASI.RIVELAZIONE;
+    s.rivelazione = this._rivelazione(g, s.offerteRoundPrincipale, vincitore, importo, s.spareggi, [], false, "");
+    s.rivelazione.sorteggiato = true;
+    s.ultimaAggiudicazione = evento;
+    this._evento("Sorteggio", evento);
   }
 
   _aggiudica(g, idVincitore, importo, offertePrincipali, spareggio) {
@@ -319,7 +359,8 @@ class MotoreAsta {
     this._evento("NonVenduto", { roundId: s.roundId, idGiocatore: g.id, motivo });
   }
 
-  _rivelazione(g, offertePrincipali, idVincitore, importoFinale, spareggi, spareggio, nonVenduto, motivo) {
+  _rivelazione(g, offertePrincipali, idVincitore, importoFinale, spareggi, spareggio,
+      nonVenduto, motivo) {
     const s = this.stato;
     const nomeDi = (id) => { const p = s.partecipanti.find((x) => x.id === id); return p ? p.nome : "#" + id; };
     const entries = Object.entries(offertePrincipali || {}).map(([k, v]) => [Number(k), v]);
@@ -341,6 +382,7 @@ class MotoreAsta {
       spareggi,
       spareggio: dettSpareggio,
       nonVenduto,
+      sorteggiato: false,
       motivoNonVenduto: motivo,
     };
   }
@@ -436,6 +478,12 @@ const MASSIMO_OFFERTE_PRONUNCIATE = 4;
 
 function testoAnnuncio(r) {
   let t = `Asta chiusa per ${r.giocatore.nome}. `;
+  if (r.sorteggiato && r.vincitore) {
+    const daDire = r.offerteInOrdine.slice(-MASSIMO_OFFERTE_PRONUNCIATE);
+    for (const o of daDire) t += `${o.partecipante} ha offerto ${o.importo}. `;
+    t += `Pareggio insuperabile. ${r.giocatore.nome} è sorteggiato a ${r.vincitore} per ${r.importoFinale} fantamilioni!`;
+    return t;
+  }
   if (r.nonVenduto) {
     if (r.offerteInOrdine.length === 0) {
       t += r.motivoNonVenduto === "saltato dal banditore"

@@ -111,3 +111,10 @@ Nuove lezioni si AGGIUNGONO in fondo, mai si cancellano.
 - **Causa**: distrazione nel comporre il testo, nessun controllo incrociato con la fonte.
 - **REGOLA**: prima di ogni comunicazione esterna, ricontrollare i numeri (partecipanti, quote, budget)
   contro SPEC.md. I numeri sbagliati in una email fanno piu' danni dei bug nel codice.
+
+## 14 · Fuzz con nuove regole: forzaChiusura in spareggio non può mettere 0
+
+- **Sintomo**: invarianti violati ("importo non positivo") nel fuzz dopo l'introduzione del sorteggio.
+- **Causa**: forzaChiusura() metteva 0 ai mancanti anche in spareggio → sorteggio a importo 0.
+- **REGOLA**: in fase SPAREGGIO, i mancanti da forzaChiusura() ricevono la propria ultima offerta
+  (mai 0). Solo nell'asta principale i mancanti fanno passo (0).
