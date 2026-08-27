@@ -55,3 +55,4 @@ desktop.ini
 .tools/sonda-qr.js
 .tools/zip-banditore/
 .tools/sonda-voce.js
+*.txt
