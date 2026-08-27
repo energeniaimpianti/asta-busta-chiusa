@@ -767,8 +767,19 @@ function ipLan() {
 function creaServer(opzioni = {}) {
   const dirDati = opzioni.dirDati || path.join(__dirname, "..", "data");
   const persistenza = new Persistenza(dirDati);
+  // PIN stabile: generato una volta, conservato in data/pin.txt ( sopravvive ai riavvii,
+  // così il banditore non lo perde se la finestra nera viene chiusa per sbaglio )
+  const filePin = path.join(dirDati, "pin.txt");
+  let pin = opzioni.pin;
+  if (!pin) {
+    try { pin = fs.readFileSync(filePin, "utf8").trim(); } catch (_) { /* prima volta */ }
+    if (!/^\d{4}$/.test(String(pin || ""))) {
+      pin = String(Math.floor(1000 + Math.random() * 9000));
+      try { fs.mkdirSync(dirDati, { recursive: true }); fs.writeFileSync(filePin, pin, "utf8"); } catch (_) {}
+    }
+  }
   const sessione = {
-    pin: opzioni.pin || String(Math.floor(1000 + Math.random() * 9000)),
+    pin,
     config: { ...CONFIG_DEFAULT },
     lista: [],
     esitoLista: null,
@@ -1185,6 +1196,7 @@ if (require.main === module) {
     console.log("  ASTA BUSTA CHIUSA — server della serata");
     console.log("=".repeat(64));
     console.log(`  PIN BANDITORE:  ${server.sessione.pin}   (ti serve nella pagina /banditore)`);
+    console.log(`  (questo PIN resta lo stesso ad ogni riavvio: conservato in data/pin.txt)`);
     console.log("");
     console.log("  Banditore:       http://localhost:" + porta + "/banditore");
     for (const ip of ips) console.log("  Partecipanti:    http://" + ip + ":" + porta);

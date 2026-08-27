@@ -107,7 +107,7 @@ function connetti() {
 function schermataPin(msg) {
   return `<div class="card centro">
     <h1>🎩 Banditore</h1>
-    <p class="muto">${msg || "Inserisci il PIN stampato nella finestra nera del server."}</p>
+    <p class="muto">${msg || "Inserisci le 4 cifre del PIN che trovi nella FINESTRA NERA del server (la trovi cliccando l'icona nera nella barra di Windows, in basso). Se non la trovi: chiudi tutto e riapri con doppio click su 'ASTA - Prova col telefono', senza chiudere la finestra nera."}</p>
     <input type="text" id="pin" inputmode="numeric" maxlength="4" placeholder="PIN" style="font-size:28px;text-align:center;letter-spacing:8px">
     <div style="height:12px"></div>
     <button class="btn btn-grande" id="vai">Entra come banditore</button>
