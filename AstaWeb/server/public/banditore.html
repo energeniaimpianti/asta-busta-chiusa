@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0d1420">
+<title>Asta Busta Chiusa — Banditore</title>
+<style>
+  :root { --blu:#2e86c1; --bluScuro:#1b4f72; --card:#16202e; --bg:#0d1420; --testo:#e8f0f8; --muto:#8aa0b8; --verde:#2ecc71; --rosso:#e74c3c; --giallo:#f1c40f; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif; background:linear-gradient(160deg,#0d1420 0%,#101d2c 55%,#0c1b15 100%) fixed var(--bg); color:var(--testo); }
+  .contenitore { max-width:900px; margin:0 auto; padding:14px 14px 60px; }
+  h1 { font-size:22px; margin:8px 0; } h2 { font-size:18px; margin:18px 0 8px; }
+  .muto { color:var(--muto); font-size:13px; }
+  .card { background:var(--card); border:1px solid #1e3246; border-radius:16px; padding:16px; margin:12px 0; box-shadow:0 4px 14px rgba(0,0,0,.35); }
+  .card.ruolo-P { border-left:4px solid #f9a825; } .card.ruolo-D { border-left:4px solid #1565c0; }
+  .card.ruolo-C { border-left:4px solid #2e7d32; } .card.ruolo-A { border-left:4px solid #c62828; }
+  .centro { text-align:center; }
+  .giocatore-nome { font-size:44px; font-weight:900; text-align:center; line-height:1.05; margin:6px 0; letter-spacing:1px; }
+  .badge-ruolo { display:inline-block; padding:4px 14px; border-radius:999px; font-weight:700; color:#fff; }
+  .r-P { background:#f9a825; color:#3b2c00; } .r-D { background:#1565c0; } .r-C { background:#2e7d32; } .r-A { background:#c62828; }
+  input[type=text], input[type=number] { width:100%; padding:10px 12px; font-size:16px; border-radius:10px; border:2px solid #2b3b50; background:#0a111c; color:var(--testo); }
+  input:focus { outline:none; border-color:var(--blu); }
+  .btn { padding:12px 18px; font-size:16px; font-weight:800; border:0; border-radius:12px; background:var(--blu); color:#fff; cursor:pointer; }
+  .btn:disabled { opacity:.35; }
+  .btn-verde { background:var(--verde); color:#06230f; }
+  .btn-rosso { background:var(--rosso); }
+  .btn-scuro { background:#22334a; color:var(--testo); font-weight:600; }
+  .btn-grande { display:block; width:100%; padding:16px; font-size:19px; }
+  .riga { display:flex; align-items:center; gap:10px; margin:8px 0; flex-wrap:wrap; }
+  .riga label { min-width:150px; font-weight:600; }
+  .mini { padding:6px 12px; font-size:18px; font-weight:800; border-radius:9px; border:0; background:#22334a; color:var(--testo); cursor:pointer; }
+  .griglia-p { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px; }
+  .part-tile { background:#101a28; border-radius:12px; padding:10px 12px; }
+  .part-tile.ok { background:#12281a; }
+  .part-tile.no { opacity:.55; }
+  .part-tile b { font-size:16px; }
+  .chip { display:inline-block; padding:3px 10px; margin:2px; border-radius:999px; background:#1c2a3d; font-size:12px; }
+  .offre { font-size:26px; margin:8px 0; display:flex; justify-content:space-between; opacity:0; transform:translateY(6px); transition:all .45s; max-width:480px; margin-left:auto; margin-right:auto; }
+  .offre.vis { opacity:1; transform:none; }
+  .vincitore { font-size:27px; font-weight:900; color:var(--verde); text-align:center; margin-top:12px; animation:vittoria 1.1s ease; border-radius:10px; }
+  @keyframes vittoria { 0% { transform:scale(.92); opacity:0; } 60% { transform:scale(1.04); } 100% { transform:scale(1); opacity:1; } }
+  .chipruolo { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; margin:2px; border-radius:999px; background:#1c2a3d; font-size:12px; font-weight:700; }
+  .prog { width:54px; height:5px; border-radius:3px; background:#0b1522; overflow:hidden; }
+  .prog i { display:block; height:100%; background:var(--blu); border-radius:3px; transition:width .5s ease; }
+  .nonvenduto { font-size:24px; font-weight:800; color:var(--rosso); text-align:center; }
+  .toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#3b1d1d; color:#ffd7d7; padding:12px 18px; border-radius:12px; display:none; z-index:9; max-width:90%; }
+  .lista-iscritti .avatar { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #22334a; }
+  .qr { background:#fff; padding:12px; border-radius:12px; display:inline-block; }
+  .indirizzo { font-size:22px; font-weight:800; color:var(--giallo); word-break:break-all; }
+  table.squadre { width:100%; border-collapse:collapse; font-size:14px; }
+  table.squadre td, table.squadre th { padding:4px 6px; border-bottom:1px solid #22334a; text-align:left; }
+  details summary { cursor:pointer; font-weight:700; padding:6px 0; }
+</style>
+</head>
+<body>
+<div class="contenitore" id="app">
+  <div class="card centro"><div class="spinner"></div><p class="muto">Connessione al server…</p></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="/vendor/qrcode.min.js"></script>
+<script>
+"use strict";
+const $app = document.getElementById("app");
+let pin = localStorage.getItem("asta_pin") || "";
+let vista = null;
+let es = null;
+let esitoLista = null;
+let cfg = null;
+
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.style.display = "block";
+  clearTimeout(t._timer); t._timer = setTimeout(() => { t.style.display = "none"; }, 3500);
+}
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+
+async function post(url, corpo) {
+  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.errore || ("Errore " + r.status));
+  return j;
+}
+async function postBin(url, buf, nomeFile, pin2) {
+  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/octet-stream", "x-nome-file": encodeURIComponent(nomeFile), "x-pin": pin2 }, body: buf });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.errore || ("Errore " + r.status));
+  return j;
+}
+
+function connetti() {
+  if (es) es.close();
+  es = new EventSource("/api/eventi?pin=" + encodeURIComponent(pin));
+  es.addEventListener("stato", (e) => {
+    vista = JSON.parse(e.data);
+    if (vista.preAvvio && vista.config) cfg = { ...vista.config };
+    // il riepilogo lista arriva dal server anche dopo un ricaricamento della pagina
+    if (vista.preAvvio && vista.esitoLista && !esitoLista) esitoLista = riassuntoDaEsito(vista.esitoLista);
+    render();
+  });
+  es.onerror = () => {
+    if (!vista) { $app.innerHTML = schermataPin("PIN errato o server irraggiungibile. Riprova."); }
+  };
+}
+
+function schermataPin(msg) {
+  return `<div class="card centro">
+    <h1>🎩 Banditore</h1>
+    <p class="muto">${msg || "Inserisci il PIN stampato nella finestra nera del server."}</p>
+    <input type="text" id="pin" inputmode="numeric" maxlength="4" placeholder="PIN" style="font-size:28px;text-align:center;letter-spacing:8px">
+    <div style="height:12px"></div>
+    <button class="btn btn-grande" id="vai">Entra come banditore</button>
+  </div>`;
+}
+
+// ---------------------------------------------------------------------- render
+
+function render() {
+  if (!vista) return;
+  if (vista.preAvvio) { $app.innerHTML = schermataSetup(); wiringSetup(); return; }
+  if (vista.fase === "FINE") { $app.innerHTML = schermataFine(); return; }
+  let html = intestazione();
+  html += (vista.fase === "RIVELAZIONE") ? pannelloRivelazione() : (pannelloGiocatore() + pannelloPartecipanti() + pannelloAzioni());
+  html += `<details><summary>📋 Squadre (aggiornate in tempo reale)</summary>${tabellaSquadre()}</details>`;
+  $app.innerHTML = html;
+  if (vista.fase === "RIVELAZIONE") avviaRivelazione();
+}
+
+function intestazione() {
+  const st = vista.statistiche || {};
+  const chips = Object.entries(st).map(([r, s]) => {
+    const pct = s.totale ? Math.round((100 * s.venduti) / s.totale) : 0;
+    return `<span class="chipruolo"><span class="prog"><i style="width:${pct}%"></i></span>${r} ${s.venduti}/${s.totale} · coda ${s.inCoda}</span>`;
+  }).join(" ");
+  const connessi = (vista.connessi || []).filter((c) => c !== "banditore").length;
+  return `<div class="riga" style="justify-content:space-between">
+    <h1 style="margin:0">⚽ ${esc(vista.config.nomeLega)}</h1>
+    <span class="muto">round ${vista.roundId} · ${connessi} telefoni connessi</span>
+  </div><div>${chips}</div>`;
+}
+
+// ------------------------------------------------------------- setup pre-avvio
+
+function schermataSetup() {
+  const q = cfg.quote;
+  const ord = cfg.ordineRuoli;
+  return `
+  <div class="riga" style="justify-content:space-between">
+    <h1 style="margin:0">🎩 Banditore — preparazione</h1>
+    <button class="btn btn-scuro" id="esci">Esci</button>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">1 · Fa' collegare i partecipanti</h2>
+    <p class="muto">Sullo stesso Wi-Fi: aprono la fotocamera o il browser e vanno su questo indirizzo (oppure scannerizzano il QR):</p>
+    <div id="indirizzi" class="centro"><span class="muto">calcolo indirizzi…</span></div>
+    <div class="centro" style="margin-top:10px"><span class="qr" id="qr"></span></div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">2 · Iscritti (<span id="n-iscritti">${(vista.partecipantiRegistrati || []).length}</span>)</h2>
+    <div class="lista-iscritti" id="iscritti">${(vista.partecipantiRegistrati || []).map((p) =>
+      `<div class="avatar"><b>${esc(p.nome)}</b><button class="mini" data-rimuovi="${p.id}" title="rimuovi">✕</button></div>`).join("") || '<div class="muto">Nessuno ancora: aspetta che si registrino dai telefoni.</div>'}</div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">3 · Lista giocatori (Excel .xlsx o CSV)</h2>
+    <p class="muto">Colonne: Nome · Ruolo · Quotazione (la quotazione NON sarà mai mostrata ai partecipanti).</p>
+    <input type="file" id="file-lista" accept=".xlsx,.csv">
+    <div id="esito-lista">${esitoLista ? riepilogoLista(esitoLista) : ""}</div>
+  </div>
+
+  <div class="card">
+    <h2 style="margin-top:0">4 · Regole</h2>
+    <div class="riga"><label>Nome lega</label><input type="text" id="cfg-nome" value="${esc(cfg.nomeLega)}" style="flex:1"></div>
+    <div class="riga"><label>Budget (FMM)</label>
+      <button class="mini" data-campo="budgetIniziale" data-delta="-10">−</button>
+      <b id="cfg-budget" style="min-width:56px;text-align:center">${cfg.budgetIniziale}</b>
+      <button class="mini" data-campo="budgetIniziale" data-delta="10">+</button>
+    </div>
+    ${["P","D","C","A"].map((r) => `
+    <div class="riga"><label>Quota ${"PDCA".includes(r) ? ({P:"Portieri",D:"Difensori",C:"Centrocampisti",A:"Attaccanti"})[r] : r}</label>
+      <button class="mini" data-quota="${r}" data-delta="-1">−</button>
+      <b id="cfg-q-${r}" style="min-width:40px;text-align:center">${q[r]}</b>
+      <button class="mini" data-quota="${r}" data-delta="1">+</button>
+    </div>`).join("")}
+    <div class="riga"><label>Ordine reparti</label>${ord.map((r, i) => `
+      <span class="chip">${i + 1}. <b>${r}</b>
+        <button class="mini" data-su="${i}" style="padding:0 6px" ${i === 0 ? "disabled" : ""}>↑</button>
+        <button class="mini" data-giu="${i}" style="padding:0 6px" ${i === ord.length - 1 ? "disabled" : ""}>↓</button>
+      </span>`).join("")}</div>
+    ${interruttore("regolaResto", "Regola del resto", "max = budget − (slot vuoti − 1)")}
+    ${interruttore("spareggioDaPari", "Spareggio da pari + 1", "al pareggio si rilancia da pari + 1")}
+    ${interruttore("baseComeMinimo", "Quotazione base = minimo", "il prezzo base del file diventa l'offerta minima")}
+    ${interruttore("ordineCasuale", "Ordine casuale nel reparto", "mescola i giocatori dentro ogni reparto")}
+  </div>
+
+  <button class="btn btn-verde btn-grande" id="avvia" ${(vista.partecipantiRegistrati || []).length >= 2 && esitoLista ? "" : "disabled"}>🏁 Avvia l'asta</button>
+  <p class="muto centro">Serve almeno 2 iscritti e la lista caricata. Con 8 iscritti e quote 3/8/8/6 servono circa 200 giocatori in lista.</p>`;
+}
+
+function riassuntoDaEsito(e) {
+  const per = { P: 0, D: 0, C: 0, A: 0 };
+  for (const g of e.giocatori || []) per[g.ruolo] = (per[g.ruolo] || 0) + 1;
+  return {
+    nomeFile: e.nomeFile || "lista", righeLette: e.righeLette, giocatori: (e.giocatori || []).length,
+    perRuolo: per, errori: e.errori || [], avvisi: e.avvisi || [],
+  };
+}
+
+function riepilogoLista(e) {
+  return `<div style="margin-top:10px">
+    <b>${esc(e.nomeFile || "lista")}</b> — ${e.giocatori} giocatori validi su ${e.righeLette} righe
+    · P ${e.perRuolo.P} · D ${e.perRuolo.D} · C ${e.perRuolo.C} · A ${e.perRuolo.A}
+    ${e.errori.length ? `<div style="color:#ff9">Scartate ${e.errori.length}: ${e.errori.slice(0, 4).map(esc).join(" · ")}</div>` : ""}
+    ${e.avvisi.length ? `<div class="muto">${e.avvisi.slice(0, 3).map(esc).join(" · ")}</div>` : ""}
+  </div>`;
+}
+
+function interruttore(campo, titolo, sotto) {
+  return `<div class="riga"><label>${titolo}<br><span class="muto">${sotto}</span></label>
+    <input type="checkbox" data-toggle="${campo}" ${cfg[campo] ? "checked" : ""} style="width:24px;height:24px"></div>`;
+}
+
+async function wiringSetup() {
+  // indirizzi + QR
+  try {
+    const r = await (await fetch("/api/indirizzi")).json();
+    const url = r.ips.length ? `http://${r.ips[0]}:${r.porta}` : `http://localhost:${r.porta}`;
+    document.getElementById("indirizzi").innerHTML = `<span class="indirizzo">${url}</span>`;
+    try {
+      const qr = qrcode(0, "M"); qr.make(url);
+      document.getElementById("qr").innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2 });
+    } catch (_) {}
+  } catch (_) {}
+
+  const salva = () => post("/api/config", { pin, config: cfg }).catch((e) => toast(e.message));
+  document.querySelectorAll("[data-campo]").forEach((b) => b.addEventListener("click", () => {
+    const c = b.dataset.campo, d = Number(b.dataset.delta);
+    cfg[c] = Math.max(50, Math.min(3000, (cfg[c] || 0) + d));
+    document.getElementById("cfg-budget").textContent = cfg.budgetIniziale; salva();
+  }));
+  document.querySelectorAll("[data-quota]").forEach((b) => b.addEventListener("click", () => {
+    const r = b.dataset.quota, d = Number(b.dataset.delta);
+    cfg.quote[r] = Math.max(0, Math.min(15, (cfg.quote[r] || 0) + d));
+    document.getElementById("cfg-q-" + r).textContent = cfg.quote[r]; salva();
+  }));
+  document.querySelectorAll("[data-toggle]").forEach((c) => c.addEventListener("change", () => { cfg[c.dataset.toggle] = c.checked; salva(); }));
+  document.querySelectorAll("[data-su],[data-giu]").forEach((b) => b.addEventListener("click", () => {
+    const i = b.dataset.su != null ? Number(b.dataset.su) : Number(b.dataset.giu);
+    const j = b.dataset.su != null ? i - 1 : i + 1;
+    const o = cfg.ordineRuoli;
+    [o[i], o[j]] = [o[j], o[i]];
+    salva().then(() => render());
+  }));
+  const nome = document.getElementById("cfg-nome");
+  if (nome) nome.addEventListener("change", () => { cfg.nomeLega = nome.value; salva(); });
+
+  document.querySelectorAll("[data-rimuovi]").forEach((b) => b.addEventListener("click", () =>
+    post("/api/rimuovi", { pin, pid: Number(b.dataset.rimuovi) }).catch((e) => toast(e.message))));
+  document.getElementById("esci").addEventListener("click", () => { localStorage.removeItem("asta_pin"); location.reload(); });
+
+  const fl = document.getElementById("file-lista");
+  fl.addEventListener("change", async () => {
+    const f = fl.files[0];
+    if (!f) return;
+    try {
+      const j = await postBin("/api/lista", await f.arrayBuffer(), f.name, pin);
+      esitoLista = { nomeFile: f.name, ...j.esito };
+      render();
+      toast("Lista caricata: " + j.esito.giocatori + " giocatori");
+    } catch (e) { toast(e.message); }
+  });
+
+  document.getElementById("avvia").addEventListener("click", async () => {
+    if (!confirm("Avviare l'asta? Da qui le regole non si cambiano più.")) return;
+    try { await post("/api/avvia", { pin }); } catch (e) { toast(e.message); }
+  });
+}
+
+// ------------------------------------------------------------- durante l'asta
+
+function pannelloGiocatore() {
+  const g = vista.giocatore;
+  if (!g) return "";
+  return `<div class="card centro ruolo-${g.ruolo}">
+    <span class="badge-ruolo r-${g.ruolo}">${g.ruolo} · ${{P:"Portiere",D:"Difensore",C:"Centrocampista",A:"Attaccante"}[g.ruolo]}</span>
+    <div class="giocatore-nome">${esc(g.nome)}</div>
+    <div class="muto">quotazione base (solo tu la vedi): <b>${g.quotazioneBase}</b></div>
+    ${vista.spareggio ? `<div style="margin-top:8px"><b>⚖ Spareggio al pari di ${vista.spareggio.pari}</b> — buste da ${vista.spareggio.min} in su</div>` : ""}
+  </div>`;
+}
+
+function pannelloPartecipanti() {
+  return `<div class="griglia-p">${vista.partecipanti.map((p) => {
+    const cls = p.stato === "PUNTATO" || p.stato === "RITIRATO" ? "ok" : (p.stato === "IN_ATTESA" ? "" : "no");
+    const etichetta = { IN_ATTESA:"⏳ deve consegnare", PUNTATO:"✅ busta chiusa", ESCLUSO_REPARTO:"🚫 reparto completo", FUORI_BUDGET:"💰 budget", FUORI_SPAREGGIO:"— fuori spareggio", RITIRATO:"🏳 ritirato" }[p.stato] || p.stato;
+    return `<div class="part-tile ${cls}"><b>${esc(p.nome)}</b><br><span class="muto">${p.budgetResiduo} FMM · rosa ${p.rosa}/25</span><br>${etichetta}</div>`;
+  }).join("")}</div>`;
+}
+
+function pannelloAzioni() {
+  return `<div class="riga" style="justify-content:center;margin-top:14px">
+    <button class="btn btn-scuro" data-azione="forza">🔔 Chiudi ora</button>
+    <button class="btn btn-scuro" data-azione="salta">⏭ Salta</button>
+    <button class="btn btn-rosso" data-azione="termina">⏹ Termina serata</button>
+  </div>`;
+}
+
+let rivelati = 0, timerRiv = null, ultimoRoundAnnunciato = -1;
+function pannelloRivelazione() {
+  const r = vista.rivelazione;
+  if (!r) return "";
+  const tot = r.offerteInOrdine.length + (r.spareggi > 0 ? r.spareggio.length + 1 : 1);
+  if (ultimoRoundAnnunciato !== vista.roundId) {
+    ultimoRoundAnnunciato = vista.roundId; rivelati = 0;
+    clearInterval(timerRiv);
+    timerRiv = setInterval(() => { if (rivelati < tot) { rivelati++; applicaVis(); } }, 500);
+  }
+  let html = `<div class="card">
+    <div class="muto centro">Asta chiusa per</div>
+    <div class="giocatore-nome">${esc(r.giocatore.nome)}</div>
+    <div id="offerte">`;
+  r.offerteInOrdine.forEach((o, i) => { html += `<div class="offre" data-i="${i}"><span>${esc(o.partecipante)}</span><b>${o.importo}</b></div>`; });
+  if (r.spareggi > 0 && r.spareggio.length) {
+    html += `<div class="centro muto" style="margin-top:8px">Spareggio</div>`;
+    r.spareggio.forEach((o, i) => { html += `<div class="offre" data-i="${r.offerteInOrdine.length + i}"><span>${esc(o.partecipante)}</span><b>${o.importo}</b></div>`; });
+  }
+  html += `<div id="esito"></div></div>
+    <div class="riga" style="justify-content:center">
+      <button class="btn btn-scuro" id="ripeti">🔊 Ripeti voce</button>
+      ${r.vincitore ? `<button class="btn btn-scuro" data-azione="annulla">↩ Annulla</button>` : ""}
+      <button class="btn btn-verde" data-azione="prossimo">Prossimo ▶</button>
+    </div>
+    <p class="muto centro">Annuncio: ${esc(vista.ultimoAnnuncio || "")}</p>
+  </div>`;
+  return html;
+}
+
+function applicaVis() {
+  document.querySelectorAll(".offre").forEach((el) => { if (Number(el.dataset.i) < rivelati) el.classList.add("vis"); });
+  const r = vista && vista.rivelazione;
+  if (!r) return;
+  const tot = r.offerteInOrdine.length + (r.spareggi > 0 ? r.spareggio.length + 1 : 1);
+  if (rivelati >= tot - 1) {
+    const esito = document.getElementById("esito");
+    if (esito) esito.innerHTML = r.nonVenduto
+      ? `<div class="nonvenduto">❌ Non venduto (${esc(r.motivoNonVenduto)})</div>`
+      : `<div class="vincitore">🏆 ${esc(r.giocatore.nome)} → ${esc(r.vincitore)} per ${r.importoFinale} FMM</div>${r.passi.length ? `<div class="muto centro">Passo: ${r.passi.map(esc).join(", ")}</div>` : ""}`;
+  }
+}
+
+function parla(testo) {
+  try {
+    const synth = window.speechSynthesis;
+    if (!synth) { toast("Voce non disponibile su questo browser"); return; }
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(testo);
+    u.lang = "it-IT"; u.rate = 0.95;
+    const voci = synth.getVoices().filter((v) => v.lang && v.lang.toLowerCase().startsWith("it"));
+    if (voci.length) u.voice = voci[0];
+    synth.speak(u);
+  } catch (_) { toast("Voce non disponibile"); }
+}
+
+function avviaRivelazione() {
+  applicaVis();
+  const r = vista.rivelazione;
+  if (!r) return;
+  const chiave = vista.roundId + ":" + r.giocatore.id + ":" + r.importoFinale + ":" + r.vincitore + ":" + r.nonVenduto + ":" + r.spareggi;
+  if (window._annunciato !== chiave) {
+    window._annunciato = chiave;
+    setTimeout(() => parla(vista.ultimoAnnuncio || testoDaRivelazione(r)), 350 + r.offerteInOrdine.length * 520);
+  }
+}
+
+function testoDaRivelazione(r) {
+  let t = `Asta chiusa per ${r.giocatore.nome}. `;
+  for (const o of r.offerteInOrdine.slice(-4)) t += `${o.partecipante} ha offerto ${o.importo}. `;
+  if (r.spareggi > 0) { t += "Pareggio in cima, spareggio. "; for (const o of r.spareggio) t += `${o.partecipante} ha offerto ${o.importo}. `; }
+  if (r.nonVenduto) t += `${r.giocatore.nome} resta svincolato.`;
+  else t += `${r.giocatore.nome} è aggiudicato a ${r.vincitore} per ${r.importoFinale} fantamilioni!`;
+  return t;
+}
+
+function tabellaSquadre() {
+  if (!vista.squadre) return "";
+  return `<div class="card">` + vista.squadre.map((s) => {
+    const ordine = { P: [], D: [], C: [], A: [] };
+    for (const a of s.rosa) ordine[a.ruolo].push(a);
+    return `<h2 style="margin:8px 0 4px">${esc(s.nome)} <span class="muto">(${s.rosa.length}/25 · ${s.budgetResiduo} FMM)</span></h2>
+      <table class="squadre"><tr>${["P","D","C","A"].map((r) => `<th style="color:#8aa0b8">${r} (${ordine[r].length})</th>`).join("")}</tr>
+      <tr>${["P","D","C","A"].map((r) => `<td valign="top">${ordine[r].map((a) => `${esc(a.nome)} <b>${a.importo}</b>`).join("<br>") || '<span class="muto">—</span>'}</td>`).join("")}</tr></table>`;
+  }).join("") + `</div>`;
+}
+
+function schermataFine() {
+  return `${intestazione()}
+  <div class="card centro"><div style="font-size:48px">🏁</div><h1 style="margin:4px 0">Asta conclusa</h1>
+    <p class="muto">${esc(vista.config.nomeLega)}</p>
+    <a class="btn btn-verde btn-grande" style="display:block;text-decoration:none;margin-top:10px" href="/api/esporta.csv?pin=${encodeURIComponent(pin)}">📤 Scarica CSV delle squadre</a>
+    <div style="height:10px"></div>
+    <button class="btn btn-rosso btn-grande" id="nuova">🆕 Nuova asta (cancella tutto)</button>
+  </div>
+  ${tabellaSquadre()}`;
+}
+
+// ------------------------------------------------------------------ eventi
+
+document.addEventListener("click", async (e) => {
+  const t = e.target.closest("button, a.btn");
+  if (!t) return;
+  if (t.id === "vai") {
+    const v = document.getElementById("pin").value.trim();
+    if (v.length !== 4) { toast("PIN a 4 cifre dalla finestra del server"); return; }
+    pin = v; localStorage.setItem("asta_pin", pin); connetti();
+    return;
+  }
+  if (t.id === "ripeti") { parla(vista && vista.ultimoAnnuncio); return; }
+  if (t.id === "nuova") {
+    if (!confirm("Azzerare definitivamente squadre e sessione?")) return;
+    try { await post("/api/nuova", { pin }); location.reload(); } catch (err) { toast(err.message); }
+    return;
+  }
+  const az = t.dataset.azione;
+  if (!az) return;
+  const conferme = {
+    forza: "Chiudere l'asta di questo giocatore? Le buste mancanti valgono passo.",
+    salta: "Saltare definitivamente questo giocatore?",
+    annulla: "Annullare l'ultima aggiudicazione e rimettere il giocatore all'asta?",
+    termina: "Terminare qui la serata? Le rose restano salvate.",
+  };
+  if (conferme[az] && !confirm(conferme[az])) return;
+  try { await post("/api/azione", { pin, azione: az }); } catch (err) { toast(err.message); }
+});
+
+window.addEventListener("beforeunload", (e) => {
+  if (vista && !vista.preAvvio && vista.fase !== "FINE") { e.preventDefault(); e.returnValue = ""; }
+});
+
+// avvio
+if (pin) connetti();
+else $app.innerHTML = schermataPin();
+</script>
+</body>
+</html>

@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e1a12">
+<title>Asta Busta Chiusa — Partecipante</title>
+<style>
+  :root { --verde:#2ecc71; --verdeScuro:#1b5e20; --card:#152a1b; --bg:#0e1a12; --testo:#eaf5ec; --muto:#8fa898; --rosso:#e74c3c; --giallo:#f1c40f; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif; background:linear-gradient(165deg,#0e1a12 0%,#101f15 55%,#0d161e 100%) fixed var(--bg); color:var(--testo); }
+  .contenitore { max-width:520px; margin:0 auto; padding:16px 14px 40px; }
+  h1 { font-size:22px; margin:10px 0 2px; }
+  .muto { color:var(--muto); font-size:13px; }
+  .card { background:var(--card); border:1px solid #24402c; border-radius:16px; padding:16px; margin:12px 0; box-shadow:0 4px 14px rgba(0,0,0,.35); }
+  .card.ruolo-P { border-top:3px solid #f9a825; } .card.ruolo-D { border-top:3px solid #1565c0; }
+  .card.ruolo-C { border-top:3px solid #2e7d32; } .card.ruolo-A { border-top:3px solid #c62828; }
+  .pop { animation:pop .5s ease; }
+  @keyframes pop { 0% { transform:scale(.9); opacity:.2; } 100% { transform:scale(1); opacity:1; } }
+  .giocatore-nome { font-size:40px; font-weight:900; text-align:center; line-height:1.05; margin:8px 0; word-break:break-word; letter-spacing:.5px; }
+  .badge-ruolo { display:inline-flex; align-items:center; gap:8px; padding:4px 14px; border-radius:999px; font-weight:700; color:#fff; }
+  .r-P { background:#f9a825; color:#3b2c00; } .r-D { background:#1565c0; } .r-C { background:#2e7d32; } .r-A { background:#c62828; }
+  .centro { text-align:center; }
+  input[type=text] { width:100%; padding:14px; font-size:18px; border-radius:12px; border:2px solid #2f4a36; background:#0b140e; color:var(--testo); }
+  input[type=text]:focus { outline:none; border-color:var(--verde); }
+  .btn { display:block; width:100%; padding:16px; font-size:18px; font-weight:800; border:0; border-radius:14px; background:var(--verde); color:#06230f; cursor:pointer; }
+  .btn:disabled { opacity:.4; }
+  .btn-secondario { background:#23402b; color:var(--testo); font-weight:600; }
+  .btn-rosso { background:var(--rosso); color:#fff; }
+  .pad { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:14px 0; }
+  .pad button { padding:18px 0; font-size:26px; font-weight:800; border:0; border-radius:14px; background:#1d3625; color:var(--testo); }
+  .pad button:active { background:var(--verdeScuro); transform:scale(.95); }
+  .display { text-align:center; font-size:52px; font-weight:900; min-height:64px; }
+  .chip { display:inline-block; padding:4px 10px; margin:3px; border-radius:999px; background:#1d3625; font-size:13px; }
+  .chip.ok { background:#1c4a26; color:#9be7ae; }
+  .offre { font-size:22px; margin:6px 0; display:flex; justify-content:space-between; opacity:0; transform:translateY(6px); transition:all .45s; }
+  .offre.vis { opacity:1; transform:none; }
+  .vincitore { font-size:21px; font-weight:900; color:var(--verde); margin-top:10px; animation:pop .7s ease; }
+  .nonvenduto { font-size:20px; font-weight:800; color:var(--rosso); }
+  .toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#3b1d1d; color:#ffd7d7; padding:12px 18px; border-radius:12px; font-size:15px; max-width:90%; display:none; z-index:9; }
+  .stato-io { font-size:16px; margin:6px 0; }
+  .avatar { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #24402c; }
+  .avatar:last-child { border-bottom:0; }
+  details { margin:10px 0; }
+  summary { cursor:pointer; font-weight:700; padding:8px 0; }
+  .rosa-riga { display:flex; justify-content:space-between; padding:5px 0; font-size:15px; }
+  .attesa-banditore { text-align:center; padding:40px 10px; }
+  .spinner { width:38px; height:38px; border:4px solid #23402b; border-top-color:var(--verde); border-radius:50%; animation:rot 1s linear infinite; margin:18px auto; }
+  @keyframes rot { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="contenitore" id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $app = document.getElementById("app");
+let pid = Number(localStorage.getItem("asta_pid") || 0);
+let token = localStorage.getItem("asta_token") || "";
+let mioNome = localStorage.getItem("asta_nome") || "";
+let vista = null;
+let es = null;
+let cifra = "";
+
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.style.display = "block";
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.display = "none"; }, 3200);
+}
+
+async function post(url, corpo) {
+  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.errore || ("Errore " + r.status));
+  return j;
+}
+
+function connetti() {
+  if (es) { es.close(); es = null; }
+  es = new EventSource("/api/eventi?pid=" + pid);
+  es.addEventListener("stato", (e) => {
+    vista = JSON.parse(e.data);
+    render();
+  });
+  es.onerror = () => { /* EventSource si riconnette da solo */ };
+}
+
+async function entra(nome) {
+  const j = await post("/api/entra", { nome });
+  pid = j.pid; token = j.token; mioNome = j.nome;
+  localStorage.setItem("asta_pid", pid);
+  localStorage.setItem("asta_token", token);
+  localStorage.setItem("asta_nome", mioNome);
+  connetti();
+}
+
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+
+// ------------------------------------------------------------------ viste
+
+function render() {
+  if (!vista) return;
+  if (vista.escluso) { $app.innerHTML = schermataNome("L'asta è già iniziata e questo nome non risulta registrato. Se ti sei disconnesso, rientra col <b>tuo stesso nome</b>."); return; }
+  if (vista.preAvvio || !vista.fase) { $app.innerHTML = schermataPre(); return; }
+  if (vista.fase === "FINE") { $app.innerHTML = schermataFine(); return; }
+  let html = "";
+  html += intestazione();
+  if (vista.fase === "RIVELAZIONE") html += pannelloRivelazione();
+  else html += pannelloAsta();
+  html += pannelloSquadre();
+  $app.innerHTML = html;
+}
+
+function intestazione() {
+  const st = vista.statistiche || {};
+  const chips = Object.entries(st).map(([r, s]) => `<span class="chip">${r} ${s.venduti}/${s.totale}</span>`).join(" ");
+  return `<div class="centro">
+    <div class="muto">${esc(vista.config.nomeLega)} · ciao <b>${esc(vista.mioNome)}</b> · budget <b>${vista.budgetResiduo}</b> FMM · rosa ${vista.rosaCount}/25</div>
+    <div style="margin-top:6px">${chips}</div>
+  </div>`;
+}
+
+function schermataNome(msg) {
+  return `<div class="card">
+    <h1>⚽ Asta Busta Chiusa</h1>
+    <p class="muto">${msg || "Scrivi il tuo nome: è con questo che il banditore ti riconoscerà."}</p>
+    <input type="text" id="nome" maxlength="30" placeholder="Il tuo nome" value="${esc(mioNome)}" autocomplete="off">
+    <div style="height:12px"></div>
+    <button class="btn" id="vai">Entra nella lega</button>
+  </div>`;
+}
+
+function schermataPre() {
+  return `<div class="attesa-banditore">
+    <div class="spinner"></div>
+    <h1>✅ Registrato come <span style="color:var(--verde)">${esc(vista.mioNome)}</span></h1>
+    <p class="muto">Tieni questo schermo aperto: l'asta partirà quando il banditore premerà "Avvia".<br>
+    Ti arriverà qui il nome di ogni giocatore, punterai in segreto dal tuo telefono<br>e sentirai il risultato dalla voce del banditore.</p>
+  </div>`;
+}
+
+function pannelloAsta() {
+  const g = vista.giocatore;
+  let html = `<div class="card centro ruolo-${g.ruolo}">
+    <span class="badge-ruolo r-${g.ruolo}">${g.ruolo} · ${g.ruolo === "P" ? "Portiere" : g.ruolo === "D" ? "Difensore" : g.ruolo === "C" ? "Centrocampista" : "Attaccante"}</span>
+    <div class="giocatore-nome">${esc(g.nome)}</div>
+  </div>`;
+
+  if (vista.fase === "SPAREGGIO" && vista.spareggio) {
+    html += `<div class="card" style="background:#33290f">
+      <b>⚖ Spareggio${vista.spareggio.candidato ? "" : " (non ti riguarda)"}</b> al pari di ${vista.spareggio.pari} FMM.<br>
+      <span class="muto">${vista.spareggio.candidato ? "Nuova busta da " + vista.spareggio.min + " FMM in su (0 = ritiro)." : "Aspetta l'esito."}</span>
+    </div>`;
+  }
+
+  const consegnate = (vista.hannoConsegnato || []).length;
+  html += `<div class="card">
+    <div class="muto">Buste consegnate: <b>${consegnate}</b></div>
+    ${(vista.hannoConsegnato || []).map((n) => `<span class="chip ok">✅ ${esc(n)}</span>`).join("")}
+  </div>`;
+
+  if (vista.daConsegnare && vista.mioStato === "IN_ATTESA") {
+    html += `<div class="card">
+      <div class="display" id="display">${cifra || "—"}</div>
+      <div class="muto centro">min ${vista.minOfferta} · max ${vista.maxOfferta} · 0 = ${vista.fase === "SPAREGGIO" ? "ritiro" : "passo"}</div>
+      <div class="pad">${["1","2","3","4","5","6","7","8","9","0","⌫","C"].map((t) => `<button data-t="${t}">${t}</button>`).join("")}</div>
+      <button class="btn btn-secondario" id="passo">Passo (0)</button>
+      <div style="height:10px"></div>
+      <button class="btn" id="consegna">Consegna busta</button>
+    </div>`;
+  } else if (vista.mioStato === "PUNTATO") {
+    html += `<div class="card centro pop"><div style="font-size:44px">✅</div><b>Busta consegnata.</b><br><span class="muto">Nessuno può vedere la tua offerta. Aspetta le altre buste.</span></div>`;
+  } else if (vista.mioStato === "RITIRATO") {
+    html += `<div class="card centro"><b>🏳 Ti sei ritirato dallo spareggio.</b></div>`;
+  } else if (vista.mioStato === "ESCLUSO_REPARTO") {
+    html += `<div class="card centro"><b>🚫 Reparto completo</b><br><span class="muto">Hai già riempito questo reparto: per questo giocatore non puoi puntare.</span></div>`;
+  } else if (vista.mioStato === "FUORI_BUDGET") {
+    html += `<div class="card centro"><b>💰 Budget insufficiente</b><br><span class="muto">Con la regola del resto non puoi permetterti questo giocatore.</span></div>`;
+  } else if (vista.mioStato === "FUORI_SPAREGGIO") {
+    html += `<div class="card centro"><b>Spareggio in corso tra gli altri.</b><br><span class="muto">La tua busta di questo round è già chiusa.</span></div>`;
+  }
+  return html;
+}
+
+let rivelati = 0;
+let timerRiv = null;
+function pannelloRivelazione() {
+  const r = vista.rivelazione;
+  if (!r) return "";
+  const tot = r.offerteInOrdine.length + (r.spareggi > 0 ? r.spareggio.length + 1 : 1);
+  if (window._ultRound !== vista.roundId) { window._ultRound = vista.roundId; rivelati = 0; clearInterval(timerRiv); timerRiv = setInterval(() => { if (rivelati < tot) { rivelati++; applicaVis(); } }, 500); }
+  let html = `<div class="card">
+    <div class="muto centro">Asta chiusa per</div>
+    <div class="giocatore-nome">${esc(r.giocatore.nome)}</div>
+    <div id="offerte">`;
+  r.offerteInOrdine.forEach((o, i) => {
+    html += `<div class="offre" data-i="${i}"><span>${esc(o.partecipante)}</span><b>${o.importo}</b></div>`;
+  });
+  if (r.spareggi > 0 && r.spareggio.length) {
+    html += `<div class="muto" style="margin-top:8px">Spareggio:</div>`;
+    r.spareggio.forEach((o, i) => {
+      html += `<div class="offre" data-i="${r.offerteInOrdine.length + i}"><span>${esc(o.partecipante)}</span><b>${o.importo}</b></div>`;
+    });
+  }
+  html += `<div id="esito"></div></div></div>`;
+  return html;
+}
+
+function applicaVis() {
+  document.querySelectorAll(".offre").forEach((el) => {
+    if (Number(el.dataset.i) < rivelati) el.classList.add("vis");
+  });
+  const r = vista && vista.rivelazione;
+  if (!r) return;
+  const tot = r.offerteInOrdine.length + (r.spareggi > 0 ? r.spareggio.length + 1 : 1);
+  if (rivelati >= tot - 1) {
+    const esito = document.getElementById("esito");
+    if (esito) {
+      if (r.nonVenduto) esito.innerHTML = `<div class="nonvenduto centro">❌ Non venduto (${esc(r.motivoNonVenduto)})</div>`;
+      else esito.innerHTML = `<div class="vincitore centro">🏆 ${esc(r.giocatore.nome)} → ${esc(r.vincitore)} per ${r.importoFinale} FMM</div>${r.passi.length ? `<div class="muto centro">Passo: ${r.passi.map(esc).join(", ")}</div>` : ""}`;
+    }
+  }
+}
+
+function pannelloSquadre() {
+  if (!vista.squadre) return "";
+  const mie = vista.squadre.find((s) => s.id === vista.pid);
+  let html = `<details><summary>📋 La mia squadra (${mie ? mie.rosa.length : 0}/25 · ${mie ? mie.budgetResiduo : 0} FMM residui)</summary><div class="card">`;
+  if (mie && mie.rosa.length) {
+    const ordine = { P: [], D: [], C: [], A: [] };
+    for (const a of mie.rosa) ordine[a.ruolo].push(a);
+    for (const r of ["P", "D", "C", "A"]) {
+      if (ordine[r].length) html += `<div class="muto">${r}</div>`;
+      for (const a of ordine[r]) html += `<div class="rosa-riga"><span>${esc(a.nome)}</span><b>${a.importo}</b></div>`;
+    }
+  } else html += `<div class="muto">Ancora nessun acquisto.</div>`;
+  html += `</div></details>`;
+  html += `<details><summary>👀 Squadre degli altri</summary><div class="card">`;
+  for (const s of vista.squadre) {
+    html += `<div class="avatar"><b>${esc(s.nome)}</b><span class="muto">${s.rosa.length}/25 · ${s.budgetResiduo} FMM</span></div>`;
+  }
+  html += `</div></details>`;
+  return html;
+}
+
+function schermataFine() {
+  let html = `<div class="card centro"><div style="font-size:48px">🏁</div><h1>Asta conclusa</h1>
+    <div class="muto">${esc(vista.config.nomeLega)}</div></div>`;
+  html += pannelloSquadre();
+  html += `<div class="card"><button class="btn btn-secondario" onclick="location.reload()">Ricarica</button></div>`;
+  return html;
+}
+
+// ------------------------------------------------------------------ eventi
+
+document.addEventListener("click", async (e) => {
+  const t = e.target.closest("button");
+  if (!t) return;
+  if (t.id === "vai") {
+    const nome = document.getElementById("nome").value.trim();
+    if (nome.length < 2) { toast("Scrivi il tuo nome (almeno 2 lettere)"); return; }
+    try { await entra(nome); } catch (err) { toast(err.message); }
+  } else if (t.dataset && t.dataset.t) {
+    const k = t.dataset.t;
+    if (k === "⌫") cifra = cifra.slice(0, -1);
+    else if (k === "C") cifra = "";
+    else if (cifra.length < 4 && (cifra !== "0")) cifra += k;
+    const d = document.getElementById("display");
+    if (d) d.textContent = cifra || "—";
+  } else if (t.id === "passo") {
+    try { await post("/api/offerta", { pid, token, importo: 0 }); cifra = ""; } catch (err) { toast(err.message); }
+  } else if (t.id === "consegna") {
+    const v = parseInt(cifra, 10);
+    if (!Number.isInteger(v) || String(v) !== cifra) { toast("Digita la tua offerta"); return; }
+    if (v !== 0 && (v < vista.minOfferta || v > vista.maxOfferta)) { toast(`Offerta tra ${vista.minOfferta} e ${vista.maxOfferta}`); return; }
+    try { await post("/api/offerta", { pid, token, importo: v }); cifra = ""; } catch (err) { toast(err.message); }
+  }
+});
+
+(async function avvio() {
+  if (pid && token) {
+    // riconnessione: verifica che la sessione sia ancora valida
+    try { connetti(); setTimeout(() => { if (!vista) schermataNomeFallback(); }, 2500); return; } catch (_) {}
+  }
+  $app.innerHTML = schermataNome();
+})();
+
+function schermataNomeFallback() {
+  if (!vista) { pid = 0; token = ""; localStorage.removeItem("asta_pid"); localStorage.removeItem("asta_token"); $app.innerHTML = schermataNome("Sessione scaduta: rientra col tuo nome."); }
+}
+
+// animazione rivelazione: applica dopo il render
+const oss = new MutationObserver(() => applicaVis());
+oss.observe($app, { childList: true });
+</script>
+</body>
+</html>
