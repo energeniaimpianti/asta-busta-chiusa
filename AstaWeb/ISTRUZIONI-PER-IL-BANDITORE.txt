@@ -46,14 +46,36 @@ LA SERA DELL'ASTA (2 minuti)
 
 IMPORTANTE
 ----------
-- Funziona SOLO nella Wi-Fi locale: serve il router della serata, NON internet.
 - Se riavvii il computer, l'asta riprende da dove era: riapri avvia-asta.bat.
 - Per ripartire da zero: pulsante "Nuova asta" nella pagina del banditore.
+
+SE C'E' UN PARTECIPANTE REMOTO (da casa sua)
+--------------------------------------------
+Se uno dei 8 non puo' essere presente fisicamente:
+
+1. NON usare avvia-asta.bat: usa invece  avvia-con-remoto.bat
+   --> si aprono DUE finestre: quella del server (come sempre, non chiudere)
+       e quella del tunnel (anch'essa da lasciare APERTA).
+2. Nella finestra del tunnel, dopo qualche secondo, compare una riga con un
+   indirizzo che inizia per https:// e finisce per .trycloudflare.com
+   --> COPIA quell'indirizzo e MANDALO al partecipante remoto (WhatsApp).
+3. Il remoto apre quel link nel browser (qualsiasi telefono o computer,
+   da casa sua, NON serve installare nulla) → scrive il suo nome → entra.
+4. Gli altri 7 in stanza si collegano col QR come al solito.
+5. Da qui in poi tutto IDENTICO: il remoto punta come tutti gli altri,
+   vede le rivelazioni, sente nulla (la voce esce solo dal tuo computer).
+
+NOTA: l'indirizzo https:// CAMBIA ogni volta che riavvii il tunnel.
+      Va comunicato al remoto SOLO quando avvii la serata (una volta sola).
+      Se il computer si spegne e riaccendi, dovrai mandargli il nuovo link.
 
 PROVA PRIMA DELLA SERA (5 minuti)
 ---------------------------------
 Doppio click su  prova-tutto.bat  → deve finire con  "TUTTI I TEST SUPERATI".
 Per una prova completa del gioco:  prova-manuale.bat  e collegati anche tu
 dal telefono col QR, come fanno i partecipanti.
+Per provare il tunnel remoto:  avvia-con-remoto.bat  → copia l'indirizzo
+https:// e Aprilo in un ALTRO browser o dal telefono usando i DATI MOBILI
+(non il Wi-Fi) per verificare che il remoto entri davvero.
 
 Dubbi? Scrivi a Giovanni :)
