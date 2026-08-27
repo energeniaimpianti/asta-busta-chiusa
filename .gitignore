@@ -1,0 +1,51 @@
+# ============================================================
+#  Asta Busta Chiusa — esclusioni dal repository
+# ============================================================
+
+# --- keystore di firma Android: MAI nel repository (resta solo sul pc + backup) ---
+*.jks
+*.keystore
+keystore.properties
+
+# --- toolchain locale pesante in .tools (scaricabile/ridistribuibile, non fonte) ---
+.tools/jdk-17*/
+.tools/android-sdk/
+.tools/kotlinc/
+.tools/*.jar
+.tools/*.zip
+.tools/out_*/
+
+# --- artefatti e log di lavoro in .tools ---
+.tools/*.log
+.tools/*.txt
+.tools/*.png
+.tools/listone_raw.html
+.tools/DebugMain*.kt
+.tools/patch_*.py
+.tools/agg_memoria.py
+.tools/patch_wrapper_posta.py
+.tools/send_email*.py
+.tools/invia_*.ps1
+.tools/invia_apk.ps1
+.tools/wrapper_dir.txt
+.tools/collaudo-liste-note.txt
+
+# --- script email del canale Aruba (contengono riferimenti alla casella personale) ---
+send_email*.py
+invia_*.ps1
+
+# --- Android: build e configurazione macchina ---
+AstaChiusa/.gradle/
+AstaChiusa/build/
+AstaChiusa/app/build/
+AstaChiusa/local.properties
+
+# --- AstaWeb: runtime e sviluppo ---
+AstaWeb/data/
+AstaWeb/node_modules/
+AstaWeb/server_console.log
+
+# --- sistema ---
+Thumbs.db
+desktop.ini
+.DS_Store
