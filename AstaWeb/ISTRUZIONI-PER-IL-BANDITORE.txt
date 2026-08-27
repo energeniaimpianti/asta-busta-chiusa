@@ -1,0 +1,50 @@
+ASTA BUSTA CHIUSA — ISTRUZIONI PER IL BANDITORE
+=================================================
+
+COSA TI SERVE (una volta sola)
+-----------------------------
+1. Un computer con Windows.
+2. Installa Node.js (gratuito, dal sito ufficiale https://nodejs.org):
+   scegli la versione "LTS" --> Avanti, Avanti, Fine.
+   NIENTE ALTRO: nessun account, nessun costo, nessuna configurazione.
+
+COSA COPIARE
+------------
+Decomprimi questa cartella dove vuoi (es. in Documenti).
+Dentro trovi: il programma (cartella "server"), la lista giocatori (cartella "liste")
+e i pulsanti di avvio.
+
+LA SERA DELL'ASTA (2 minuti)
+----------------------------
+1. Doppio click su  avvia-asta.bat
+   --> si apre una finestra NERA: NON CHIUDERLA MAI, è il motore dell'asta.
+   --> se Windows chiede "Consenti l'accesso a Node.js" su reti PRIVATE: premi CONSENTI.
+   --> il browser apre già la pagina del banditore.
+2. Nella finestra nera cerchi la riga   PIN BANDITORE: XXXX   (4 cifre).
+3. Scrivi quelle 4 cifre nella pagina e premi "Entra come banditore".
+4. Sezione "3 · Lista giocatori" --> scegli il file  liste/lista-seriea-2026-27.xlsx
+   --> deve comparire "228 giocatori validi".
+5. I 7 partecipanti: col telefono si collegano alla STESSA Wi-Fi, aprono la fotocamera,
+   inquadrano il QR mostrato nella tua pagina (o digitano l'indirizzo scritto sotto il QR),
+   scrivono il loro nome. Devono comparirti tra gli "Iscritti".
+6. Quando ci sono tutti: tasto verde  AVVIA L'ASTA.
+7. Da lì il flusso è automatico: appare il NOME del giocatore sui telefoni, ognuno digita
+   la propria offerta segreta (0 = passo). Quando hanno consegnato tutti - o tu premi
+   "CHIUDI ORA" (i ritardatari fanno passo) - il computer ANNUNCIA A VOCE i 4 punteggi
+   più alti e il vincitore. Tasto "PROSSIMO" per il giocatore dopo.
+   Pulsanti extra: SPARA (salta un giocatore), SQUADRE (rose aggiornate),
+   TERMINA (a fine serata, con scarico CSV delle squadre).
+
+IMPORTANTE
+----------
+- Funziona SOLO nella Wi-Fi locale: serve il router della serata, NON internet.
+- Se riavvii il computer, l'asta riprende da dove era: riapri avvia-asta.bat.
+- Per ripartire da zero: pulsante "Nuova asta" nella pagina del banditore.
+
+PROVA PRIMA DELLA SERA (5 minuti)
+---------------------------------
+Doppio click su  prova-tutto.bat  → deve finire con  "TUTTI I TEST SUPERATI".
+Per una prova completa del gioco:  prova-manuale.bat  e collegati anche tu
+dal telefono col QR, come fanno i partecipanti.
+
+Dubbi? Scrivi a Giovanni :)
