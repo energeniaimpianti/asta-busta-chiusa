@@ -31,8 +31,8 @@ keystore.properties
 .tools/collaudo-liste-note.txt
 
 # --- script email del canale Aruba (contengono riferimenti alla casella personale) ---
-send_email*.py
-invia_*.ps1
+send_*email*.py
+*invia*.ps1
 
 # --- Android: build e configurazione macchina ---
 AstaChiusa/.gradle/
