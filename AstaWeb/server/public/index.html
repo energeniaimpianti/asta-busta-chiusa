@@ -9,7 +9,45 @@
   :root { --verde:#2ecc71; --verdeScuro:#1b5e20; --card:#152a1b; --bg:#0e1a12; --testo:#eaf5ec; --muto:#8fa898; --rosso:#e74c3c; --giallo:#f1c40f; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   body { margin:0; font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif; background:linear-gradient(165deg,#0e1a12 0%,#101f15 55%,#0d161e 100%) fixed var(--bg); color:var(--testo); }
-  .contenitore { max-width:520px; margin:0 auto; padding:16px 14px 40px; }
+  .contenitore { max-width:520px; margin:0 auto; padding:16px 14px 80px; }
+  @media (min-width:900px) {
+    .contenitore { max-width:1100px; padding:20px 24px 60px; }
+    .due-colonne { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .giocatore-nome { font-size:52px !important; }
+    .display { font-size:64px !important; }
+    .pad button { font-size:32px !important; padding:24px 0 !important; }
+    .card { padding:20px; }
+    .offerta-riga { font-size:24px !important; }
+  }
+  .sticky-header {
+    position:sticky; top:0; z-index:100;
+    background:linear-gradient(135deg,#0e1a12 0%,#12291a 100%);
+    border-bottom:2px solid #2e7d32;
+    padding:10px 14px;
+    margin:-16px -14px 12px;
+    border-radius:0 0 14px 14px;
+    box-shadow:0 4px 12px rgba(0,0,0,.5);
+  }
+  @media (min-width:900px) { .sticky-header { margin:-20px -24px 16px; padding:12px 24px; } }
+  .sticky-header .budget-big {
+    font-size:22px; font-weight:900; color:#4caf50;
+  }
+  .sticky-header .slot-badge {
+    display:inline-block; padding:2px 8px; margin:2px; border-radius:6px;
+    font-size:12px; font-weight:700;
+  }
+  .slot-p { background:#5d4a0a; color:#f9a825; }
+  .slot-d { background:#0d2d4a; color:#64b5f6; }
+  .slot-c { background:#1b3a1e; color:#81c784; }
+  .slot-a { background:#4a1215; color:#ef9a9a; }
+  .slot-full { opacity:.4; text-decoration:line-through; }
+  .mercato-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .mercato-table th { text-align:left; padding:6px 8px; color:#8fa898; border-bottom:1px solid #24402c; font-weight:600; }
+  .mercato-table td { padding:6px 8px; border-bottom:1px solid #1a2e1f; }
+  .mercato-table .io { background:#12291a; font-weight:700; border-radius:6px; }
+  .mercato-table .budget-cell { font-weight:800; color:#4caf50; text-align:right; }
+  .mercato-table .io .budget-cell { color:#66bb6a; }
+  .mercato-media { padding:8px 0 0; color:#8fa898; font-size:12px; }
   h1 { font-size:22px; margin:10px 0 2px; }
   .muto { color:var(--muto); font-size:13px; }
   .card { background:var(--card); border:1px solid #24402c; border-radius:16px; padding:16px; margin:12px 0; box-shadow:0 4px 14px rgba(0,0,0,.35); }
@@ -110,16 +148,39 @@ function render() {
   html += intestazione();
   if (vista.fase === "RIVELAZIONE") html += pannelloRivelazione();
   else html += pannelloAsta();
+  html += `<div class="due-colonne"><div>`;
+  html += pannelloMercato();
+  html += `</div><div>`;
   html += pannelloSquadre();
+  html += `</div></div>`;
   $app.innerHTML = html;
 }
 
 function intestazione() {
   const st = vista.statistiche || {};
-  const chips = Object.entries(st).map(([r, s]) => `<span class="chip">${r} ${s.venduti}/${s.totale}</span>`).join(" ");
-  return `<div class="centro">
-    <div class="muto">${esc(vista.config.nomeLega)} · ciao <b>${esc(vista.mioNome)}</b> · budget <b>${vista.budgetResiduo}</b> FMM · rosa ${vista.rosaCount}/25</div>
-    <div style="margin-top:6px">${chips}</div>
+  const quote = vista.config.quote || { P: 3, D: 8, C: 8, A: 6 };
+  const mie = vista.squadre ? vista.squadre.find((x) => x.id === vista.pid) : null;
+  const conteggi = { P: 0, D: 0, C: 0, A: 0 };
+  if (mie) for (const a of mie.rosa) conteggi[a.ruolo] = (conteggi[a.ruolo] || 0) + 1;
+  const slots = ["P","D","C","A"].map((r) => {
+    const pieno = conteggi[r] >= (quote[r] || 0);
+    return `<span class="slot-badge slot-${r.toLowerCase()} ${pieno ? "slot-full" : ""}">${r} ${conteggi[r]}/${quote[r] || "?"}</span>`;
+  }).join(" ");
+  const budgetCol = vista.budgetResiduo > 100 ? "#4caf50" : vista.budgetResiduo > 40 ? "#ff9800" : "#f44336";
+  const venduti = Object.values(st).reduce((a, x) => a + (x.venduti || 0), 0);
+  const totaleLista = Object.values(st).reduce((a, x) => a + (x.totale || 0), 0);
+  return `<div class="sticky-header">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+      <div>
+        <span style="font-weight:700;font-size:14px;">${esc(vista.mioNome || "")}</span>
+        <span class="budget-big" style="color:${budgetCol};margin-left:12px;">💰 ${vista.budgetResiduo} FMM</span>
+      </div>
+      <div>${slots}</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:11px;color:#8fa898;">
+      <span>${esc(vista.config.nomeLega)}</span>
+      <span>Venduti ${venduti}/${totaleLista}</span>
+    </div>
   </div>`;
 }
 
@@ -225,24 +286,94 @@ function applicaVis() {
   }
 }
 
+function pannelloMercato() {
+  if (!vista.squadre || !vista.squadre.length) return "";
+  const quote = vista.config.quote || { P: 3, D: 8, C: 8, A: 6 };
+  const ordine = vista.config.ordineRuoli || ["P","D","C","A"];
+  const ordinati = [...vista.squadre].sort((a, b) => b.budgetResiduo - a.budgetResiduo);
+
+  function conteggi(sq) {
+    const c = { P: 0, D: 0, C: 0, A: 0 };
+    for (const a of sq.rosa) c[a.ruolo] = (c[a.ruolo] || 0) + 1;
+    return c;
+  }
+
+  // medie prezzi per ruolo
+  const somme = { P: 0, D: 0, C: 0, A: 0 }, nums = { P: 0, D: 0, C: 0, A: 0 };
+  for (const sq of vista.squadre) for (const a of sq.rosa) {
+    if (a.importo > 0) { somme[a.ruolo] += a.importo; nums[a.ruolo]++; }
+  }
+
+  const righe = ordinati.map((sq) => {
+    const c = conteggi(sq);
+    const io = sq.id === vista.pid;
+    const celle = ordine.map((r) => `<td>${c[r]}/${quote[r] || "?"}</td>`).join("");
+    return `<tr class="${io ? "io" : ""}">
+      <td>${io ? "▸ " : ""}${esc(sq.nome)}</td>
+      <td class="budget-cell">${sq.budgetResiduo}</td>
+      ${celle}
+    </tr>`;
+  }).join("");
+
+  const mediaTxt = ordine.map((r) => {
+    const m = nums[r] ? Math.round(somme[r] / nums[r]) : 0;
+    return `${r} ${m}`;
+  }).join(" · ");
+
+  return `<details open><summary style="cursor:pointer;font-weight:700;padding:8px 0;">📊 Mercato in tempo reale</summary>
+  <div class="card" style="overflow-x:auto;">
+    <table class="mercato-table">
+      <tr><th></th><th style="text-align:right;">Budget</th>${ordine.map((r) => `<th>${r}</th>`).join("")}</tr>
+      ${righe}
+    </table>
+    <div class="mercato-media">Media prezzi: ${mediaTxt}</div>
+  </div></details>`;
+}
+
 function pannelloSquadre() {
   if (!vista.squadre) return "";
   const mie = vista.squadre.find((s) => s.id === vista.pid);
-  let html = `<details><summary>📋 La mia squadra (${mie ? mie.rosa.length : 0}/25 · ${mie ? mie.budgetResiduo : 0} FMM residui)</summary><div class="card">`;
-  if (mie && mie.rosa.length) {
+
+  // helper: genera la rosa di una squadra raggruppata per ruolo
+  function rosaHtml(sq, isMia) {
+    if (!sq.rosa.length) return `<div class="muto" style="padding:6px 0;">Nessun acquisto ancora.</div>`;
     const ordine = { P: [], D: [], C: [], A: [] };
-    for (const a of mie.rosa) ordine[a.ruolo].push(a);
+    for (const a of sq.rosa) ordine[a.ruolo].push(a);
+    let h = "";
     for (const r of ["P", "D", "C", "A"]) {
-      if (ordine[r].length) html += `<div class="muto">${r}</div>`;
-      for (const a of ordine[r]) html += `<div class="rosa-riga"><span>${esc(a.nome)}</span><b>${a.importo}</b></div>`;
+      if (ordine[r].length) {
+        h += `<div style="padding:4px 0 2px;font-size:11px;font-weight:700;color:${getColorRuolo(r)};">${r} (${ordine[r].length})</div>`;
+        for (const a of ordine[r]) {
+          h += `<div class="rosa-riga" style="${isMia ? "font-weight:600;" : ""}"><span>${esc(a.nome)}</span><b style="color:${a.importo > 25 ? "#ef9a9a" : a.importo > 12 ? "#ffcc80" : "#a5d6a7"};">${a.importo}</b></div>`;
+        }
+      }
     }
-  } else html += `<div class="muto">Ancora nessun acquisto.</div>`;
-  html += `</div></details>`;
-  html += `<details><summary>👀 Squadre degli altri</summary><div class="card">`;
-  for (const s of vista.squadre) {
-    html += `<div class="avatar"><b>${esc(s.nome)}</b><span class="muto">${s.rosa.length}/25 · ${s.budgetResiduo} FMM</span></div>`;
+    return h;
   }
+
+  function getColorRuolo(r) {
+    return { P: "#f9a825", D: "#64b5f6", C: "#81c784", A: "#ef9a9a" }[r] || "#888";
+  }
+
+  // la mia squadra (sempre visibile, non richiudibile su PC)
+  let html = `<details open><summary style="cursor:pointer;font-weight:700;padding:8px 0;">📋 La mia squadra (${mie ? mie.rosa.length : 0}/25 · 💰 ${mie ? mie.budgetResiduo : 0} FMM)</summary><div class="card">`;
+  html += rosaHtml(mie, true);
   html += `</div></details>`;
+
+  // squadre avversarie: con rose complete, richiudibili
+  const altri = vista.squadre.filter((s) => s.id !== vista.pid);
+  html += `<details><summary style="cursor:pointer;font-weight:700;padding:8px 0;">👀 Rose avversarie (${altri.length} squadre)</summary>`;
+  for (const sq of altri) {
+    const speso = sq.rosa.reduce((a, x) => a + x.importo, 0);
+    html += `<details style="margin:6px 0;"><summary style="cursor:pointer;padding:8px 12px;background:#152a1b;border-radius:10px;display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-weight:700;">${esc(sq.nome)}</span>
+      <span style="font-size:12px;color:#8fa898;">${sq.rosa.length}/25 · 💰${sq.budgetResiduo}</span>
+    </summary>
+    <div class="card" style="margin-top:4px;padding:10px;">
+      ${rosaHtml(sq, false)}
+    </div></details>`;
+  }
+  html += `</details>`;
   return html;
 }
 
