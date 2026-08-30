@@ -17,10 +17,13 @@ si collega col browser alla Wi-Fi della serata.
 4. A ogni giocatore: sul telefono di tutti appare **solo il nome** (mai la quotazione base,
    mai le offerte altrui); ognuno digita la propria offerta segreta o passa.
 5. Quando tutti hanno consegnato — o il banditore preme **Chiudi ora** — la rivelazione
-   appare **sul telefono di ciascuno** e il computer del banditore **parla a voce**
-   (TTS italiano) **solo i 4 punteggi più alti** in ordine crescente (esclusi i passi;
-   se le offerte valide sono meno di 4, si dicono tutte), chiudendo sul vincitore.
-6. Squadre e budget sempre aggiornati nella pagina; a fine asta **esportazione CSV** delle rose.
+   appare **sul telefono di ciascuno** e **la voce del banditore annuncia** (TTS italiano,
+   italiano e barese): le 3-4 offerte più alte in ordine crescente (tutte se sono meno),
+   l'eventuale spareggio raccontato, e la chiusura sul vincitore. La voce esce dal
+   **dispositivo del banditore che ha la spunta «Questo dispositivo parla»**: il telefono
+   (consigliato, eventuale cassa Bluetooth) o il computer.
+6. Squadre e budget sempre aggiornati nella pagina; a fine asta **esportazione Excel
+   multi-foglio** (squadre, riepilogo, asta completa, analisi, svincolati) o CSV delle rose.
 
 ## Requisiti (solo per il pc del banditore)
 
@@ -39,19 +42,28 @@ si collega col browser alla Wi-Fi della serata.
 
 ## Collaudo effettuato (massimo rigore)
 
-- **31 test automatici Node** (`server/asta-server.test.js`): motore di regole portato dal
-  Kotlin (14 casi: chiusura automatica/forzata, spareggi da pari+1, reinserti, annulli,
-  regola del resto, esclusioni reparto, ordini, determinismo), parser CSV/XLSX con fixture
-  reali e file corrotti (9), **fuzz di 300 aste complete con invarianti a ogni passo**,
-  determinismo del replay, completamento deterministico delle rose da 25, stress 12×500
-  giocatori (4), e server HTTP: flusso completo 8 partecipanti con **verifica di segretezza
-  delle offerte**, spareggio via API, **riavvio del server con ripresa dello stato**,
-  pagine e QR serviti (4).
-- **Collaudo E2E nel browser reale** (`e2e.js`, due Chrome isolati + 7 partecipanti via API):
-  registrazione, setup, avvio con conferma nativa, nome senza quotazione sul telefono,
-  busta segreta dalla UI, chiusura automatica, rivelazione crescente 10→22→31→44 con
-  vincitore e passi su ENTRAMBI gli schermi, TTS con voci italiane, avanzamento,
-  forza chiusura con non venduto. Screenshot in `.tools/e2e_*.png`.
+- **59 test automatici Node** in 4 suite (tutte in `prova-tutto.bat` e in CI):
+  - `asta-server.test.js` (38): motore di regole portato dal Kotlin, parser CSV/XLSX con
+    fixture reali e file corrotti, **fuzz di 300 aste complete con invarianti a ogni passo**,
+    server HTTP con **verifica di segretezza delle offerte**, spareggio via API, **riavvio
+    del server con ripresa dello stato**, annuncio cachato (Ripeti voce identico),
+    **rate-limit del PIN** e **export Excel 5 fogli verificato in lettura indipendente**.
+  - `test-voce.test.js` (18): il motore della voce (141 frasi italiane/baresi) — invarianti
+    (giocatore/vincitore/prezzo sempre detti, solo numeri leciti), lettura delle sole 3-4
+    offerte più alte, trigger delle categorie (alto/risicato/economico/generale), margine
+    calcolato sull'ultimo spareggio, spareggio raccontato, tre motivi del non venduto,
+    anti-ripetizione, determinismo con rng iniettabile.
+  - `pagine-parse.test.js` (2): gli script inline di banditore.html e index.html devono
+    compilare (antigressione della pagina morta del 30/08).
+  - `collaudo-liste.test.js` (1): listone ufficiale 228 giocatori + integrazione server.
+- **Collaudo E2E nel browser reale** (`e2e.js`, due Chrome isolati a viewport telefono 420×900,
+  23 checkpoint): registrazione, **ingresso del banditore dalla pagina partecipante**, setup,
+  avvio con conferma nativa, **modalità telefonino (toggle voce, bottoni touch ≥48px)**, nome
+  senza quotazione sul telefono, busta segreta dalla UI, chiusura automatica, rivelazione
+  crescente con annuncio v3 (offerte basse mai lette), **forza chiusura con motivo coerente,
+  passi menzionati con 1 offerta, spareggio raccontato dal vivo, annullamento con budget
+  ripristinato, salta senza falsi «nessuno lo vuole»**, termine e **download Excel 5 fogli**.
+  Screenshot in `.tools/e2e_*.png`.
 
 ## Struttura
 
@@ -61,17 +73,23 @@ AstaWeb/
 ├── LEGGIMI.md              ← questo file
 ├── server/
 │   ├── asta-server.js      ← TUTTO il prodotto: motore + parser .xlsx/.csv + server HTTP/SSE + persistenza
+│   ├── voce-banditore.js   ← motore degli annunci a voce (italiano/barese, 141 frasi, 5 strutture)
+│   ├── esporta-xlsx.js     ← Excel multi-foglio a fine asta (zip in puro Node, niente PowerShell)
 │   ├── asta-server.test.js ← suite di collaudo (node --test)
+│   ├── test-voce.test.js   ← collaudo del motore voce
+│   ├── pagine-parse.test.js← antigressione: gli script inline delle pagine devono compilare
 │   ├── public/index.html   ← pagina partecipante (telefono)
-│   ├── public/banditore.html ← sala di controllo del banditore (voce inclusa)
+│   ├── public/banditore.html ← sala di controllo del banditore, anche da telefono (voce inclusa)
 │   └── vendor/qrcode.min.js  ← QR (libreria MIT qrcode-generator, incorporata)
 ├── test-fixtures/          ← .xlsx di prova generati con implementazione indipendente
-├── e2e.js                  ← collaudo browser (sviluppo; richiede puppeteer-core)
+├── e2e.js                  ← collaudo browser a viewport telefono (sviluppo; richiede puppeteer-core)
 └── data/                   ← creato a runtime: stato + log eventi (non cancellare durante l'asta)
 ```
 
 Rigenerare i test: `cd server && node --test asta-server.test.js`
+Collaudo della voce: `cd server && node --test test-voce.test.js`
 Collaudo del listone ufficiale: `cd server && node --test collaudo-liste.test.js`
+Tutto insieme (come ! TEST AUTOMATICI): `prova-tutto.bat` — 59 test (l'E2E browser è a parte)
 
 ## Listone pronto (lista-seriea-2026-27)
 

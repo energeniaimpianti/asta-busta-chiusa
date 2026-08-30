@@ -738,6 +738,62 @@ test("server: rate-limit sul PIN — oltre 8 errori dallo stesso IP, 429 anche c
   }
 });
 
+function scaricaBinario(porta, percorso) {
+  return new Promise((ok, ko) => {
+    const req = http.get({ host: "127.0.0.1", port: porta, path: percorso, agent: false }, (res) => {
+      const pezzi = [];
+      res.on("data", (c) => pezzi.push(c));
+      res.on("end", () => ok({ stato: res.statusCode, buf: Buffer.concat(pezzi) }));
+    });
+    req.on("error", ko);
+  });
+}
+
+test("server: export Excel multi-foglio — 5 fogli e contenuti verificati in lettura indipendente", async () => {
+  const dirTmp = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "astaweb-"));
+  const server = creaServer({ dirDati: dirTmp });
+  const porta = await ascolta(server);
+  const pin = server.sessione.pin;
+  try {
+    const tA = (await chiama(porta, "/api/entra", "POST", JSON.stringify({ nome: "Alfa" }))).json.token;
+    const tB = (await chiama(porta, "/api/entra", "POST", JSON.stringify({ nome: "Beta" }))).json.token;
+    await chiama(porta, "/api/lista", "POST", Buffer.from(csvDemo), { "x-pin": pin });
+    await chiama(porta, "/api/avvia", "POST", JSON.stringify({ pin }));
+    // round 1 (G3): Alfa 10, Beta 22 → aggiudicato a Beta; poi chiudi la serata
+    await chiama(porta, "/api/offerta", "POST", JSON.stringify({ pid: 1, token: tA, importo: 10 }));
+    await chiama(porta, "/api/offerta", "POST", JSON.stringify({ pid: 2, token: tB, importo: 22 }));
+    assert.strictEqual((await chiama(porta, "/api/azione", "POST", JSON.stringify({ pin, azione: "termina" }))).stato, 200);
+
+    const r = await scaricaBinario(porta, "/api/esporta.xlsx?pin=" + pin);
+    assert.strictEqual(r.stato, 200, "download xlsx");
+    assert.ok(r.buf.length > 4000, "xlsx sostanzioso: " + r.buf.length + " byte");
+    assert.strictEqual(r.buf.readUInt16LE(0), 0x4b50, "magia zip PK");
+
+    // verifica strutturale: 5 fogli con i nomi dichiarati
+    const voci = unzip(r.buf);
+    const wb = voci["xl/workbook.xml"].toString("utf8");
+    for (const nome of ["Squadre", "Riepilogo", "Asta", "Analisi", "Svincolati"]) {
+      assert.ok(wb.includes(nome), "foglio mancante: " + nome);
+    }
+    for (let i = 1; i <= 5; i++) assert.ok(voci["xl/worksheets/sheet" + i + ".xml"], "sheet" + i + ".xml mancante");
+
+    // verifica semantica: il primo foglio (Squadre) rileggetto col parser contiene l'acquisto
+    const griglia = ParserXlsx.leggiGriglia(r.buf);
+    const piatto = griglia.map((riga) => riga.join("|")).join("\n");
+    assert.ok(piattaCsv(piatto).includes("beta"), "Beta nel foglio Squadre");
+    assert.ok(piattaCsv(piatto).includes("g3"), "il giocatore acquistato (G3) nel foglio Squadre");
+
+    // protezione PIN sull'export
+    assert.strictEqual((await chiama(porta, "/api/esporta.xlsx?pin=0000")).stato, 403);
+  } finally {
+    if (server.closeAllConnections) server.closeAllConnections();
+    await new Promise((ok) => server.close(ok));
+    fs.rmSync(dirTmp, { recursive: true, force: true });
+  }
+});
+
+function piattaCsv(s) { return s.toLowerCase(); }
+
 test("server: pagina partecipante e banditore servite, vendor QR presente", async () => {
   const dirTmp = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "astaweb-"));
   const server = creaServer({ dirDati: dirTmp });

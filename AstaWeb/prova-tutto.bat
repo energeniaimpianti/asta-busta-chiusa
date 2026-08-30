@@ -15,6 +15,10 @@ echo === Test AstaWeb: motore, parser, robustezza, server ===
 node --test server\asta-server.test.js
 if errorlevel 1 goto :ko
 echo.
+echo === Voce del banditore: coerenza degli annunci ===
+node --test server\test-voce.test.js
+if errorlevel 1 goto :ko
+echo.
 echo === Pagine pubbliche: sintassi JavaScript ===
 node --test server\pagine-parse.test.js
 if errorlevel 1 goto :ko

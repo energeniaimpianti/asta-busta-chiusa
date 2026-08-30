@@ -13,7 +13,7 @@ jobs:
         with:
           node-version: "22"
       - name: Test motore, parser, robustezza, server e listone ufficiale
-        run: node --test AstaWeb/server/asta-server.test.js AstaWeb/server/collaudo-liste.test.js AstaWeb/server/pagine-parse.test.js
+        run: node --test AstaWeb/server/asta-server.test.js AstaWeb/server/collaudo-liste.test.js AstaWeb/server/test-voce.test.js AstaWeb/server/pagine-parse.test.js
 
   android:
     name: App Android (Kotlin) - test e APK di verifica

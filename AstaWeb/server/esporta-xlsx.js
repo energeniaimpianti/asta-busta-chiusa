@@ -12,10 +12,6 @@
 "use strict";
 
 const zlib = require("zlib");
-const { execSync } = require("child_process");
-const os = require("os");
-const path = require("path");
-const fs = require("fs");
 
 // ============================================================ COSTANTI STILI
 
@@ -219,24 +215,70 @@ function generaStyles() {
 
 // ============================================================ ZIP MINIMO
 
+// CRC32 (IEEE 802.3) con tabella precalcolata
+const CRC_TAB = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(buf) {
+  let c = 0xffffffff;
+  for (let i = 0; i < buf.length; i++) c = CRC_TAB[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
 class ZipWriter {
   constructor() { this.files = []; }
-  add(name, content) { this.files.push({ name, data: Buffer.from(content, "utf8") }); }
+  add(name, content) {
+    // i nomi entry usano SEMPRE lo slash: è lo standard zip/OOXML
+    this.files.push({ name: String(name).replace(/\\/g, "/"), data: Buffer.from(content, "utf8") });
+  }
   build() {
-    // Usa PowerShell per creare lo zip (affidabile su Windows)
-    const tmp = path.join(os.tmpdir(), `xlsx_${Date.now()}`);
-    fs.mkdirSync(tmp, { recursive: true });
+    // zip scritto a mano in puro Node (zlib deflateRaw): niente PowerShell —
+    // Compress-Archive metteva i backslash nei nomi (zip non conforme, Excel
+    // può rifiutarlo) e su Linux/CI non esiste proprio
+    const parti = [];
+    const centrale = [];
+    let off = 0;
     for (const f of this.files) {
-      const fp = path.join(tmp, f.name);
-      fs.mkdirSync(path.dirname(fp), { recursive: true });
-      fs.writeFileSync(fp, f.data);
+      const nome = Buffer.from(f.name, "utf8");
+      const dati = zlib.deflateRawSync(f.data, { level: 9 });
+      const crc = crc32(f.data);
+      const lh = Buffer.alloc(30);
+      lh.writeUInt32LE(0x04034b50, 0);
+      lh.writeUInt16LE(20, 4);            // versione minima per estrarre
+      lh.writeUInt16LE(0, 6);             // flag
+      lh.writeUInt16LE(8, 8);             // metodo: deflate
+      lh.writeUInt32LE(crc, 14);
+      lh.writeUInt32LE(dati.length, 18);  // dimensione compressa
+      lh.writeUInt32LE(f.data.length, 22);// dimensione originale
+      lh.writeUInt16LE(nome.length, 26);
+      lh.writeUInt16LE(0, 28);            // lunghezza extra
+      parti.push(lh, nome, dati);
+      const ce = Buffer.alloc(46);
+      ce.writeUInt32LE(0x02014b50, 0);
+      ce.writeUInt16LE(20, 4); ce.writeUInt16LE(20, 6);
+      ce.writeUInt16LE(0, 8); ce.writeUInt16LE(8, 10);
+      ce.writeUInt32LE(crc, 16);
+      ce.writeUInt32LE(dati.length, 20);
+      ce.writeUInt32LE(f.data.length, 24);
+      ce.writeUInt16LE(nome.length, 28);
+      ce.writeUInt32LE(off, 42);          // offset del local header
+      centrale.push(Buffer.concat([ce, nome]));
+      off += 30 + nome.length + dati.length;
     }
-    const zipPath = tmp + ".zip";
-    execSync(`powershell -NoProfile -Command "Compress-Archive -Path '${tmp}\\*' -DestinationPath '${zipPath}' -Force"`, { stdio: "pipe" });
-    const buf = fs.readFileSync(zipPath);
-    fs.rmSync(tmp, { recursive: true, force: true });
-    fs.unlinkSync(zipPath);
-    return buf;
+    const cd = Buffer.concat(centrale);
+    const eocd = Buffer.alloc(22);
+    eocd.writeUInt32LE(0x06054b50, 0);
+    eocd.writeUInt16LE(this.files.length, 8);
+    eocd.writeUInt16LE(this.files.length, 10);
+    eocd.writeUInt32LE(cd.length, 12);
+    eocd.writeUInt32LE(off, 16);
+    return Buffer.concat([...parti, cd, eocd]);
   }
 }
 
