@@ -15,6 +15,10 @@ echo === Test AstaWeb: motore, parser, robustezza, server ===
 node --test server\asta-server.test.js
 if errorlevel 1 goto :ko
 echo.
+echo === Pagine pubbliche: sintassi JavaScript ===
+node --test server\pagine-parse.test.js
+if errorlevel 1 goto :ko
+echo.
 echo === Collaudo listone ufficiale 2026/27 ===
 node --test server\collaudo-liste.test.js
 if errorlevel 1 goto :ko

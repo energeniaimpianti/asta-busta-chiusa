@@ -471,10 +471,6 @@ function testoDaRivelazione(r) {
   return t;
 }
 function _numeroCasuale(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
-  if (r.nonVenduto) t += `${r.giocatore.nome} resta svincolato.`;
-  else t += `${r.giocatore.nome} è aggiudicato a ${r.vincitore} per ${r.importoFinale} fantamilioni!`;
-  return t;
-}
 
 function tabellaSquadre() {
   if (!vista.squadre) return "";
