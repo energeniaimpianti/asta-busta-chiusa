@@ -260,6 +260,7 @@ class MotoreAsta {
     const base = s.spareggi > 0 ? s.offerteRoundPrincipale : s.offerte;
     s.nonVenduti.push(g.id);
     s.rivelazione = this._rivelazione(g, base, null, 0, s.spareggi, s.ultimoSpareggio, true, "saltato dal banditore");
+    s.rivelazione.annuncio = generaAnnuncio(s.rivelazione);
     s.fase = FASI.RIVELAZIONE;
     this._evento("SaltaGiocatore", { idGiocatore: g.id });
     return { ok: true };
@@ -317,8 +318,9 @@ class MotoreAsta {
     sq.rosa.push({ idGiocatore: g.id, importo });
     const evento = { roundId: s.roundId, idGiocatore: g.id, idPartecipante: vincitore, importo, spareggi: s.spareggi };
     s.fase = FASI.RIVELAZIONE;
-    s.rivelazione = this._rivelazione(g, s.offerteRoundPrincipale, vincitore, importo, s.spareggi, [], false, "");
+    s.rivelazione = this._rivelazione(g, s.offerteRoundPrincipale, vincitore, importo, s.spareggi, { ...s.offerte }, false, "");
     s.rivelazione.sorteggiato = true;
+    s.rivelazione.annuncio = generaAnnuncio(s.rivelazione);
     s.ultimaAggiudicazione = evento;
     this._evento("Sorteggio", evento);
   }
@@ -331,6 +333,7 @@ class MotoreAsta {
     const evento = { roundId: s.roundId, idGiocatore: g.id, idPartecipante: idVincitore, importo, spareggi: s.spareggi };
     s.fase = FASI.RIVELAZIONE;
     s.rivelazione = this._rivelazione(g, offertePrincipali, idVincitore, importo, s.spareggi, spareggio, false, "");
+    s.rivelazione.annuncio = generaAnnuncio(s.rivelazione);
     s.ultimaAggiudicazione = evento;
     this._evento("Aggiudicazione", evento);
   }
@@ -358,6 +361,7 @@ class MotoreAsta {
     if (definitivo) s.nonVenduti.push(g.id);
     s.fase = FASI.RIVELAZIONE;
     s.rivelazione = this._rivelazione(g, base, null, 0, s.spareggi, s.ultimoSpareggio, true, motivo);
+    s.rivelazione.annuncio = generaAnnuncio(s.rivelazione);
     this._evento("NonVenduto", { roundId: s.roundId, idGiocatore: g.id, motivo });
   }
 
@@ -409,6 +413,7 @@ class MotoreAsta {
       s.nonVenduti.push(g.id);
       s.fase = FASI.RIVELAZIONE;
       s.rivelazione = this._rivelazione(g, {}, null, 0, 0, {}, true, "nessuno idoneo (reparto pieno)");
+      s.rivelazione.annuncio = generaAnnuncio(s.rivelazione);
       this._evento("NonVenduto", { roundId: s.roundId, idGiocatore: g.id, motivo: "nessuno idoneo (reparto pieno)" });
     }
     return s;
@@ -906,7 +911,9 @@ function creaServer(opzioni = {}) {
       rivelazione: s.rivelazione,
       squadre: vistaSquadre(),
       tuttiCompleti: sessione.motore.tuttiCompleti,
-      ultimoAnnuncio: s.rivelazione ? generaAnnuncio(s.rivelazione) : null,
+      // annuncio CACHATO alla nascita della rivelazione: "Ripeti voce" e il testo
+      // mostrato coincidono con quanto pronunciato (non rigenerato a ogni broadcast)
+      ultimoAnnuncio: s.rivelazione ? (s.rivelazione.annuncio || generaAnnuncio(s.rivelazione)) : null,
     };
   }
 

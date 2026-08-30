@@ -682,6 +682,34 @@ test("server: forza chiusura con buste mancanti e spareggio via API", async () =
   }
 });
 
+test("server: annuncio del banditore stabile — cachato nella rivelazione, mai rigenerato", async () => {
+  const dirTmp = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "astaweb-"));
+  const server = creaServer({ dirDati: dirTmp });
+  const porta = await ascolta(server);
+  const pin = server.sessione.pin;
+  try {
+    const tA = (await chiama(porta, "/api/entra", "POST", JSON.stringify({ nome: "Alfa" }))).json.token;
+    const tB = (await chiama(porta, "/api/entra", "POST", JSON.stringify({ nome: "Beta" }))).json.token;
+    await chiama(porta, "/api/lista", "POST", Buffer.from(csvDemo), { "x-pin": pin });
+    await chiama(porta, "/api/avvia", "POST", JSON.stringify({ pin }));
+    await chiama(porta, "/api/offerta", "POST", JSON.stringify({ pid: 1, token: tA, importo: 10 }));
+    await chiama(porta, "/api/offerta", "POST", JSON.stringify({ pid: 2, token: tB, importo: 22 }));
+
+    // due viste consecutive (due connessioni SSE distinte): STESSO annuncio
+    const vb1 = await primaVistaSse(porta, "pin=" + pin);
+    assert.strictEqual(vb1.fase, "RIVELAZIONE");
+    assert.ok(typeof vb1.rivelazione.annuncio === "string" && vb1.rivelazione.annuncio.length > 20, "annuncio cachato nella rivelazione");
+    assert.strictEqual(vb1.ultimoAnnuncio, vb1.rivelazione.annuncio, "la vista espone l'annuncio cachato");
+    assert.ok(vb1.ultimoAnnuncio.includes("Beta") && vb1.ultimoAnnuncio.includes("22"), "l'annuncio dice vincitore e prezzo");
+    const vb2 = await primaVistaSse(porta, "pin=" + pin);
+    assert.strictEqual(vb2.ultimoAnnuncio, vb1.ultimoAnnuncio, "il broadcast NON rigenera l'annuncio (Ripeti voce identico)");
+  } finally {
+    if (server.closeAllConnections) server.closeAllConnections();
+    await new Promise((ok) => server.close(ok));
+    fs.rmSync(dirTmp, { recursive: true, force: true });
+  }
+});
+
 test("server: pagina partecipante e banditore servite, vendor QR presente", async () => {
   const dirTmp = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "astaweb-"));
   const server = creaServer({ dirDati: dirTmp });
