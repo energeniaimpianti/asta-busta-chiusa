@@ -22,6 +22,7 @@ const path = require("path");
 const os = require("os");
 const zlib = require("zlib");
 const { generaXlsx } = require("./esporta-xlsx.js");
+const { generaAnnuncio } = require("./voce-banditore.js");
 const crypto = require("crypto");
 
 // ============================================================ MOTORE DI REGOLE
@@ -905,7 +906,7 @@ function creaServer(opzioni = {}) {
       rivelazione: s.rivelazione,
       squadre: vistaSquadre(),
       tuttiCompleti: sessione.motore.tuttiCompleti,
-      ultimoAnnuncio: s.rivelazione ? testoAnnuncio(s.rivelazione) : null,
+      ultimoAnnuncio: s.rivelazione ? generaAnnuncio(s.rivelazione) : null,
     };
   }
 
@@ -1281,7 +1282,7 @@ if (require.main === module) {
 }
 
 module.exports = {
-  MotoreAsta, ParserLista, ParserXlsx, testoAnnuncio, esportaCsvDaStato,
+  MotoreAsta, ParserLista, ParserXlsx, testoAnnuncio, generaAnnuncio, esportaCsvDaStato,
   creaServer, CONFIG_DEFAULT, normalizzaRuolo, parseIntero, grigliaDaCsv, unzip,
   FASI, RUOLI,
 };

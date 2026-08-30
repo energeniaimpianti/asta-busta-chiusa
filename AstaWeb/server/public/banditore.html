@@ -462,9 +462,15 @@ function avviaRivelazione() {
 }
 
 function testoDaRivelazione(r) {
+  // fallback locale se il server non ha ancora mandato l'annuncio generato
   let t = `Asta chiusa per ${r.giocatore.nome}. `;
-  for (const o of r.offerteInOrdine.slice(-4)) t += `${o.partecipante} ha offerto ${o.importo}. `;
-  if (r.spareggi > 0) { t += "Pareggio in cima, spareggio. "; for (const o of r.spareggio) t += `${o.partecipante} ha offerto ${o.importo}. `; }
+  for (const o of r.offerteInOrdine.slice(-_numeroCasuale(3, 4))) t += `${o.partecipante} ${o.importo}. `;
+  if (r.sorteggiato && r.vincitore) t += `Pareggio! ${r.giocatore.nome} è sorteggiato a ${r.vincitore} per ${r.importoFinale}!`;
+  else if (r.vincitore) t += `${r.giocatore.nome} è di ${r.vincitore} per ${r.importoFinale} fantamilioni!`;
+  else t += `${r.giocatore.nome} resta svincolato.`;
+  return t;
+}
+function _numeroCasuale(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
   if (r.nonVenduto) t += `${r.giocatore.nome} resta svincolato.`;
   else t += `${r.giocatore.nome} è aggiudicato a ${r.vincitore} per ${r.importoFinale} fantamilioni!`;
   return t;
