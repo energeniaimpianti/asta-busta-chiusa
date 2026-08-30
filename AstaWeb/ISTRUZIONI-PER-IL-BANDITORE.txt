@@ -22,6 +22,31 @@ Nella pagina, sotto il nome della lega, trovi la barra "Voce":
 - scegli dal menu' una voce "Online (Natural)" (es. Elsa o Giuseppe)
 - regola la Velocita' (consigliato 0.9) e premi "Prova" finche' ti piace
 - la scelta resta salvata: rifalla solo se cambi computer.
+Dal TELEFONO la voce migliore e' quella di Google che Chrome propone da solo:
+non devi scegliere nulla, al massimo regoli la velocita'.
+
+MODALITA' TELEFONINO (il computer fa solo da centralina)
+-------------------------------------------------------
+Puoi fare il banditore col TELEFONO in mano: comandi, voce e annunci
+escono dal telefono, il computer resta acceso in un angolo (anche col
+suo schermo che nessuno guarda) e non va mai toccato.
+
+1. Avvia come sempre col doppio click su avvia-asta.bat ( computer = centralina ).
+2. Dal telefono: inquadra col telefono il QR che compare sulla pagina del
+   computer (o apri l'indirizzo scritto sotto il QR).
+3. Nella pagina che si apre, in fondo, tocca " SONO IL BANDITORE ".
+4. Digita il PIN (4 cifre dalla finestra nera del computer) ed entra.
+5. Nella barra "Voce" del telefono:
+   - alla prima entrata il pulsante "Prova" LAMPEGGIA: toccalo una volta,
+     serve a sbloccare l'audio del telefono (Android lo chiede una volta sola);
+   - lascia SPUNTATA la casella "Questo dispositivo parla" (il telefono parla).
+6. Da qui fai TUTTO dal telefono: carica lista, avvia, chiudi, prossimo.
+   Lo schermo del telefono resta acceso da solo durante l'asta.
+CONSIGLI per la serata: telefono in CARICA durante l'asta; per una voce piu'
+grossa in stanza, collega al telefono una cassa BLUETOOTH (si collega prima
+di aprire la pagina). Se preferisci la voce dal computer: apri la pagina del
+banditore anche sul PC e togli la spunta "Questo dispositivo parla" dal
+telefono (o viceversa): chi ha la spunta parla, gli altri comandano in silenzio.
 
 LA SERA DELL'ASTA (2 minuti)
 ----------------------------

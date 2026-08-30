@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1420">
 <title>Asta Busta Chiusa — Banditore</title>
 <style>
@@ -54,6 +54,31 @@
   table.squadre { width:100%; border-collapse:collapse; font-size:14px; }
   table.squadre td, table.squadre th { padding:4px 6px; border-bottom:1px solid #22334a; text-align:left; }
   details summary { cursor:pointer; font-weight:700; padding:6px 0; }
+  .riga-azioni { display:flex; gap:10px; justify-content:center; margin-top:14px; flex-wrap:wrap; }
+  .riga-azioni .btn { min-height:48px; }
+  #prova-voce.chiama { animation:pulsante 1s infinite alternate; }
+  @keyframes pulsante { from { transform:scale(1); } to { transform:scale(1.06); } }
+
+  /* ---------- TELEFONO DEL BANDITORE: bottoni grandi, una colonna ---------- */
+  @media (max-width:700px) {
+    .contenitore { padding:10px 10px 44px; }
+    h1 { font-size:19px; } h2 { font-size:16px; }
+    .giocatore-nome { font-size:30px; }
+    .btn { padding:14px 16px; }
+    .mini { padding:10px 16px; font-size:20px; }
+    .griglia-p { grid-template-columns:1fr; }
+    .part-tile { padding:12px 14px; }
+    .offre { font-size:22px; }
+    .vincitore { font-size:21px; }
+    .nonvenduto { font-size:19px; }
+    .riga label { min-width:120px; }
+    .riga-azioni .btn { flex:1 1 140px; min-height:56px; font-size:15px; padding:12px 10px; }
+    .riga-azioni .btn-verde { order:-1; } /* Prossimo/Avvia sempre per primo */
+    .barra-voce { font-size:12px; gap:8px; }
+    select#voce-select { max-width:100%; flex:1 1 100%; }
+    .indirizzo { font-size:18px; }
+    .btn-grande { padding:18px; font-size:20px; }
+  }
 </style>
 </head>
 <body>
@@ -108,6 +133,9 @@ function popolaVoci() {
   sel.innerHTML = vs.length
     ? vs.map((v) => `<option value="${v.name}" ${attuale && v.name === attuale.name ? "selected" : ""}>${v.name}</option>`).join("")
     : `<option value="">(nessuna voce italiana trovata)</option>`;
+  // finché la voce non è sbloccata da un gesto, il bottone Prova chiama l'attenzione
+  const b = document.getElementById("prova-voce");
+  if (b && parlaAttivo() && !voceSbloccata) b.classList.add("chiama");
   // le voci "Online (Natural)" di Edge si caricano in ritardo: riprova dopo 2s se il menu è vuoto
   if (!vs.length) setTimeout(() => { if (document.getElementById("voce-select")) popolaVoci(); }, 2000);
 }
@@ -120,14 +148,78 @@ function barraVoce() {
     <label for="voce-velocita">Velocità</label>
     <input type="range" id="voce-velocita" min="0.6" max="1.15" step="0.05" value="${velocitaVoce()}">
     <button class="btn btn-scuro" id="prova-voce" style="padding:6px 12px;font-size:13px">Prova 🔊</button>
+    <label style="display:flex;align-items:center;gap:6px;font-weight:700" title="Se spento, questo dispositivo resta muto: la voce e i comandi possono stare su due dispositivi diversi">
+      <input type="checkbox" id="voce-attiva" ${parlaAttivo() ? "checked" : ""} style="width:20px;height:20px"> Questo dispositivo parla
+    </label>
     <span class="muto">consigliato: apri questa pagina in Microsoft Edge per le voci naturali</span>
   </div>`;
 }
+
+// ---- chi parla, su quale dispositivo ----
+// Toggle per dispositivo (localStorage): il telefono può fare la voce mentre il
+// PC resta muto (o viceversa): entrambi aprono /banditore con lo stesso PIN.
+function parlaAttivo() { return localStorage.getItem("asta_parla") !== "0"; }
+
+// ---- sblocco voce su gesto (Chrome Android) ----
+// La prima speak() deve avvenire dentro un gesto utente, altrimenti il TTS
+// programmatico (rivelazione via SSE) resta muto. Ogni gesto parlante chiama
+// gestoParlante(); finché la voce non è sbloccata, il bottone Prova lampeggia.
+let voceSbloccata = false;
+function gestoParlante() {
+  voceSbloccata = true;
+  const b = document.getElementById("prova-voce");
+  if (b) b.classList.remove("chiama");
+  try {
+    if (window.speechSynthesis) { const u = new SpeechSynthesisUtterance(" "); u.volume = 0; speechSynthesis.speak(u); }
+  } catch (_) {}
+}
+function promemoriaVoce() {
+  toast("🔊 Tocca «Prova» per attivare la voce su questo dispositivo");
+  const b = document.getElementById("prova-voce");
+  if (b) b.classList.add("chiama");
+}
+
+// ---- schermo sempre acceso durante l'asta ----
+let wakeLock = null;
+async function tieneSvegio() {
+  try {
+    if ("wakeLock" in navigator && !wakeLock && document.visibilityState === "visible") {
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", () => { wakeLock = null; });
+    }
+  } catch (_) {}
+}
+async function lasciaDormire() {
+  try { if (wakeLock) { await wakeLock.release(); } } catch (_) {}
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") tieneSvegio(); });
 
 function toast(msg) {
   const t = document.getElementById("toast");
   t.textContent = msg; t.style.display = "block";
   clearTimeout(t._timer); t._timer = setTimeout(() => { t.style.display = "none"; }, 3500);
+}
+// copia con fallback: navigator.clipboard NON esiste su HTTP in LAN (solo https/localhost)
+window.copiaIndirizzo = function (url, el) {
+  const fatto = () => { if (el) el.style.background = "#1b5e20"; toast("Indirizzo copiato"); };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(fatto).catch(() => copiaDiRiserva(url, fatto));
+      return;
+    }
+  } catch (_) {}
+  copiaDiRiserva(url, fatto);
+};
+function copiaDiRiserva(url, fatto) {
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = url; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    if (ok) { fatto(); return; }
+  } catch (_) {}
+  toast("Copia automatica bloccata: tieni premuto sull'indirizzo e copia a mano");
 }
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
 
@@ -166,7 +258,7 @@ function connetti() {
 function schermataPin(msg) {
   return `<div class="card centro">
     <h1>🎩 Banditore</h1>
-    <p class="muto">${msg || "Inserisci le 4 cifre del PIN che trovi nella FINESTRA NERA del server (la trovi cliccando l'icona nera nella barra di Windows, in basso). Se non la trovi: chiudi tutto e riapri con doppio click su 'ASTA - Prova col telefono', senza chiudere la finestra nera."}</p>
+    <p class="muto">${msg || "Inserisci le 4 cifre del PIN mostrate all'avvio del server, alla riga «PIN BANDITORE» (finestra nera sul computer che ha fatto partire l'asta)."}</p>
     <input type="text" id="pin" inputmode="numeric" maxlength="4" placeholder="PIN" style="font-size:28px;text-align:center;letter-spacing:8px">
     <div style="height:12px"></div>
     <button class="btn btn-grande" id="vai">Entra come banditore</button>
@@ -181,7 +273,11 @@ function render() {
     $app.innerHTML = schermataSetup() + barraVoce();
     wiringSetup(); popolaVoci(); return;
   }
-  if (vista.fase === "FINE") { $app.innerHTML = schermataFine() + barraVoce(); popolaVoci(); return; }
+  if (vista.fase === "FINE") {
+    lasciaDormire(); // fine serata: il telefono può spegnere lo schermo
+    $app.innerHTML = schermataFine() + barraVoce(); popolaVoci(); return;
+  }
+  tieneSvegio(); // durante l'asta lo schermo del banditore resta acceso
   let html = intestazione() + barraVoce();
   html += (vista.fase === "RIVELAZIONE") ? pannelloRivelazione() : (pannelloGiocatore() + pannelloPartecipanti() + pannelloAzioni());
   html += `<details><summary>📋 Squadre (aggiornate in tempo reale)</summary>${tabellaSquadre()}</details>`;
@@ -293,8 +389,8 @@ async function wiringSetup() {
     const url = r.ips.length ? `http://${r.ips[0]}:${r.porta}` : `http://localhost:${r.porta}`;
     document.getElementById("indirizzi").innerHTML = `
       <div style="margin:8px 0;padding:12px;background:#132530;border:2px solid #2e86c1;border-radius:10px;">
-        <div class="indirizzo" style="font-size:22px;word-break:break-all;user-select:all;cursor:pointer;" onclick="navigator.clipboard.writeText('${url}').then(()=>this.style.background='#1b5e20').catch(()=>{});" title="clicca per copiare">${url}</div>
-        <div class="muto" style="margin-top:6px;font-size:12px;">👈 clicca per COPIARE — oppure inquadrane il QR sotto</div>
+        <div class="indirizzo" style="font-size:22px;word-break:break-all;user-select:all;cursor:pointer;" onclick="copiaIndirizzo('${url}', this)" title="tocca per copiare">${url}</div>
+        <div class="muto" style="margin-top:6px;font-size:12px;">👈 tocca per COPIARE — oppure inquadrane il QR sotto</div>
       </div>`;
     try {
       // versione 3 (più piccola, scansiona meglio) + margine 4 + correzione alta
@@ -369,7 +465,7 @@ function pannelloPartecipanti() {
 }
 
 function pannelloAzioni() {
-  return `<div class="riga" style="justify-content:center;margin-top:14px">
+  return `<div class="riga-azioni">
     <button class="btn btn-scuro" data-azione="forza">🔔 Chiudi ora</button>
     <button class="btn btn-scuro" data-azione="salta">⏭ Salta</button>
     <button class="btn btn-rosso" data-azione="termina">⏹ Termina serata</button>
@@ -396,7 +492,7 @@ function pannelloRivelazione() {
     r.spareggio.forEach((o, i) => { html += `<div class="offre" data-i="${r.offerteInOrdine.length + i}"><span>${esc(o.partecipante)}</span><b>${o.importo}</b></div>`; });
   }
   html += `<div id="esito"></div></div>
-    <div class="riga" style="justify-content:center">
+    <div class="riga-azioni">
       <button class="btn btn-scuro" id="ripeti">🔊 Ripeti voce</button>
       ${r.vincitore ? `<button class="btn btn-scuro" data-azione="annulla">↩ Annulla</button>` : ""}
       <button class="btn btn-verde" data-azione="prossimo">Prossimo ▶</button>
@@ -438,7 +534,8 @@ function parla(testo) {
     const voce = voceScelta();
     const vel = velocitaVoce();
     // fraseggio: ogni frase un'iterazione a se (pause naturali tra le offerte)
-    const frasi = String(testo).split(/(?<=[.!?:])\s+/).filter((f) => f.trim());
+    // split senza lookbehind: la regex lookbehind uccide Safari < 16.4
+    const frasi = String(testo).replace(/([.!?:])\s+/g, "$1\u0001").split("\u0001").filter((f) => f.trim());
     (frasi.length ? frasi : [testo]).forEach((frase) => {
       const u = new SpeechSynthesisUtterance(frase.trim());
       u.lang = "it-IT";
@@ -457,7 +554,11 @@ function avviaRivelazione() {
   const chiave = vista.roundId + ":" + r.giocatore.id + ":" + r.importoFinale + ":" + r.vincitore + ":" + r.nonVenduto + ":" + r.spareggi;
   if (window._annunciato !== chiave) {
     window._annunciato = chiave;
-    setTimeout(() => parla(vista.ultimoAnnuncio || testoDaRivelazione(r)), 350 + r.offerteInOrdine.length * 520);
+    setTimeout(() => {
+      if (!parlaAttivo()) return; // questo dispositivo è muto: parla un altro
+      if (!voceSbloccata) { promemoriaVoce(); return; }
+      parla(vista.ultimoAnnuncio || testoDaRivelazione(r));
+    }, 350 + r.offerteInOrdine.length * 520);
   }
 }
 
@@ -500,6 +601,16 @@ function schermataFine() {
 
 document.addEventListener("change", (e) => {
   if (e.target && e.target.id === "voce-select") localStorage.setItem("asta_voce", e.target.value);
+  if (e.target && e.target.id === "voce-attiva") {
+    localStorage.setItem("asta_parla", e.target.checked ? "1" : "0");
+    if (e.target.checked) {
+      gestoParlante(); // il toggle è già un gesto: ne approfittiamo per sbloccare il TTS
+      toast("Questo dispositivo ora parla");
+    } else {
+      try { window.speechSynthesis && speechSynthesis.cancel(); } catch (_) {}
+      toast("Questo dispositivo è muto: la voce può uscire da un altro");
+    }
+  }
 });
 document.addEventListener("input", (e) => {
   if (e.target && e.target.id === "voce-velocita") localStorage.setItem("asta_vel", e.target.value);
@@ -507,14 +618,21 @@ document.addEventListener("input", (e) => {
 document.addEventListener("click", async (e) => {
   const t = e.target.closest("button, a.btn");
   if (!t) return;
-  if (t.id === "prova-voce") { parla("Asta chiusa per Lautaro Martinez. Bruno ha offerto venti. Aggiudicato a Bruno per venti fantamilioni!"); return; }
+  tieneSvegio(); // ogni interazione del banditore è un'occasione per tenere lo schermo acceso
+  if (t.id === "prova-voce") { gestoParlante(); parla("Asta chiusa per Lautaro Martinez. Bruno ha offerto venti. Aggiudicato a Bruno per venti fantamilioni!"); return; }
   if (t.id === "vai") {
+    gestoParlante(); // Entrando col PIN si sblocca anche la voce (Chrome Android)
     const v = document.getElementById("pin").value.trim();
-    if (v.length !== 4) { toast("PIN a 4 cifre dalla finestra del server"); return; }
+    if (v.length !== 4) { toast("PIN a 4 cifre, alla riga «PIN BANDITORE» del server"); return; }
     pin = v; localStorage.setItem("asta_pin", pin); connetti();
     return;
   }
-  if (t.id === "ripeti") { parla(vista && vista.ultimoAnnuncio); return; }
+  if (t.id === "ripeti") {
+    gestoParlante();
+    if (!parlaAttivo()) { toast("Questo dispositivo è muto: attiva «Questo dispositivo parla»"); return; }
+    parla(vista && vista.ultimoAnnuncio);
+    return;
+  }
   if (t.id === "nuova") {
     if (!confirm("Azzerare definitivamente squadre e sessione?")) return;
     try { await post("/api/nuova", { pin }); location.reload(); } catch (err) { toast(err.message); }

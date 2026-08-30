@@ -710,6 +710,34 @@ test("server: annuncio del banditore stabile — cachato nella rivelazione, mai 
   }
 });
 
+test("server: rate-limit sul PIN — oltre 8 errori dallo stesso IP, 429 anche col PIN giusto", async () => {
+  const dirTmp = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "astaweb-"));
+  const server = creaServer({ dirDati: dirTmp });
+  const porta = await ascolta(server);
+  const pin = server.sessione.pin;
+  try {
+    for (let i = 0; i < 9; i++) {
+      const r = await chiama(porta, "/api/avvia", "POST", JSON.stringify({ pin: "0000" }));
+      assert.strictEqual(r.stato, 403, "i primi errori restano 403 (tentativo " + (i + 1) + ")");
+    }
+    const bloccato = await chiama(porta, "/api/avvia", "POST", JSON.stringify({ pin: "0000" }));
+    assert.strictEqual(bloccato.stato, 429, "dopo 9 errori si entra nel blocco");
+    // durante il blocco viene rifiutato anche il PIN GIUSTO
+    const giusto = await chiama(porta, "/api/avvia", "POST", JSON.stringify({ pin }));
+    assert.strictEqual(giusto.stato, 429, "il blocco non si aggira col PIN giusto");
+    // anche la SSE con PIN errato risponde 429
+    const sse = await chiama(porta, "/api/eventi?pin=0000");
+    assert.strictEqual(sse.stato, 429, "SSE bloccata");
+    // i partecipanti (senza PIN) non sono toccati dal limite
+    const rEntra = await chiama(porta, "/api/entra", "POST", JSON.stringify({ nome: "Libero" }));
+    assert.strictEqual(rEntra.stato, 200, "la registrazione partecipante non passa dal PIN");
+  } finally {
+    if (server.closeAllConnections) server.closeAllConnections();
+    await new Promise((ok) => server.close(ok));
+    fs.rmSync(dirTmp, { recursive: true, force: true });
+  }
+});
+
 test("server: pagina partecipante e banditore servite, vendor QR presente", async () => {
   const dirTmp = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "astaweb-"));
   const server = creaServer({ dirDati: dirTmp });

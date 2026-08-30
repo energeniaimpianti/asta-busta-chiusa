@@ -862,6 +862,23 @@ function creaServer(opzioni = {}) {
 
   const clienti = new Set(); // {res, ruolo:'banditore'|pid, pid}
 
+  // anti-forzatura del PIN (4 cifre, l'unica barriera anche sul tunnel pubblico):
+  // oltre 8 PIN errati dallo stesso IP in 60 secondi → 60 secondi di rifiuto (429)
+  const erroriPin = new Map(); // ip -> { ts: [ms], bloccatoFino: ms }
+  function ipDi(req) { return req.socket.remoteAddress || "?"; }
+  function pinBloccato(ip) {
+    const e = erroriPin.get(ip);
+    return !!(e && e.bloccatoFino > Date.now());
+  }
+  function registraPinErrato(ip) {
+    const ora = Date.now();
+    const e = erroriPin.get(ip) || { ts: [], bloccatoFino: 0 };
+    e.ts = e.ts.filter((t) => ora - t < 60000);
+    e.ts.push(ora);
+    if (e.ts.length > 8) e.bloccatoFino = ora + 60000;
+    erroriPin.set(ip, e);
+  }
+
   function broadcast() {
     for (const c of [...clienti]) {
       try {
@@ -1019,14 +1036,19 @@ function creaServer(opzioni = {}) {
 
     // ---------------------------------------------------------- SSE
     if (req.method === "GET" && p === "/api/eventi") {
+      const pin = u.searchParams.get("pin");
+      const pid = Number(u.searchParams.get("pid"));
+      if (pin != null) {
+        const ip = ipDi(req);
+        if (pinBloccato(ip)) return json(res, 429, { errore: "Troppi tentativi PIN: attendi un minuto" });
+        if (pin !== sessione.pin) { registraPinErrato(ip); return json(res, 403, { errore: "PIN errato" }); }
+      }
       res.writeHead(200, {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-store",
         Connection: "keep-alive",
       });
       res.write("retry: 2000\n\n");
-      const pin = u.searchParams.get("pin");
-      const pid = Number(u.searchParams.get("pid"));
       let cliente;
       if (pin && pin === sessione.pin) cliente = { res, ruolo: "banditore" };
       else if (Number.isInteger(pid)) {
@@ -1047,7 +1069,12 @@ function creaServer(opzioni = {}) {
     }
 
     if (req.method === "GET" && p === "/api/esporta.csv") {
-      if (u.searchParams.get("pin") !== sessione.pin) return json(res, 403, { errore: "PIN banditore errato" });
+      if (u.searchParams.get("pin") !== sessione.pin) {
+        const ip = ipDi(req);
+        if (pinBloccato(ip)) return json(res, 429, { errore: "Troppi tentativi PIN: attendi un minuto" });
+        registraPinErrato(ip);
+        return json(res, 403, { errore: "PIN banditore errato" });
+      }
       res.writeHead(200, {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": 'attachment; filename="asta_squadre.csv"',
@@ -1057,7 +1084,12 @@ function creaServer(opzioni = {}) {
     }
 
     if (req.method === "GET" && p === "/api/esporta.xlsx") {
-      if (u.searchParams.get("pin") !== sessione.pin) return json(res, 403, { errore: "PIN banditore errato" });
+      if (u.searchParams.get("pin") !== sessione.pin) {
+        const ip = ipDi(req);
+        if (pinBloccato(ip)) return json(res, 429, { errore: "Troppi tentativi PIN: attendi un minuto" });
+        registraPinErrato(ip);
+        return json(res, 403, { errore: "PIN banditore errato" });
+      }
       try {
         const xlsxBuf = generaXlsx(sessione.motore.stato);
         res.writeHead(200, {
@@ -1080,6 +1112,12 @@ function creaServer(opzioni = {}) {
 
     // il PIN arriva nel corpo JSON (azioni) o nell'header x-pin (upload file binario)
     const pinOk = dati.pin === sessione.pin || req.headers["x-pin"] === sessione.pin;
+    const rotteConPin = ["/api/config", "/api/lista", "/api/rimuovi", "/api/avvia", "/api/azione", "/api/nuova"];
+    if (rotteConPin.includes(p)) {
+      const ip = ipDi(req);
+      if (pinBloccato(ip)) return json(res, 429, { errore: "Troppi tentativi PIN: attendi un minuto" });
+      if (!pinOk) { registraPinErrato(ip); return json(res, 403, { errore: "PIN banditore errato" }); }
+    }
 
     if (p === "/api/entra") {
       const nome = String(dati.nome || "").trim().slice(0, 30);
