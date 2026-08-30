@@ -393,8 +393,13 @@ async function wiringSetup() {
         <div class="muto" style="margin-top:6px;font-size:12px;">👈 tocca per COPIARE — oppure inquadrane il QR sotto</div>
       </div>`;
     try {
-      // versione 3 (più piccola, scansiona meglio) + margine 4 + correzione alta
-      const qr = qrcode(3, "Q"); qr.make(url);
+      // versione 3 (più piccola, scansiona meglio) + margine 4 + correzione alta.
+      // addData in modalità "Byte": con la selezione AUTOMATICA la libreria
+      // codifica l'URL in modalità alfanumerica e produce simboli che molti
+      // lettori NON decodificano (verificato con zbar e OpenCV: payload vuoto).
+      const qr = qrcode(3, "Q");
+      qr.addData(url, "Byte");
+      qr.make();
       document.getElementById("qr").innerHTML = qr.createSvgTag({ cellSize: 6, margin: 4 });
     } catch (_) {}
   } catch (_) {}

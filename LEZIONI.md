@@ -118,3 +118,18 @@ Nuove lezioni si AGGIUNGONO in fondo, mai si cancellano.
 - **Causa**: forzaChiusura() metteva 0 ai mancanti anche in spareggio → sorteggio a importo 0.
 - **REGOLA**: in fase SPAREGGIO, i mancanti da forzaChiusura() ricevono la propria ultima offerta
   (mai 0). Solo nell'asta principale i mancanti fanno passo (0).
+
+## 15 · Un QR "disegnato" non è un QR "leggibile": verificare con un decoder VERO
+
+- **Sintomo**: tre segnalazioni reali di "il QR non funziona!!!" (27-30/08); ogni volta si
+  aggiustavano versione/correzione/margine e il QR sembrava a posto (SVG renderizzato,
+  struttura verificata) ma i telefoni continuavano a non leggere.
+- **Causa radicale (trovata il 30/08 con decodifica indipendente)**: la libreria vendored
+  qrcode-generator, con la selezione AUTOMATICA dei dati, codifica gli URL in modalità
+  alfanumerica e produce simboli che i lettori NON decodificano: zbar e OpenCV entrambi
+  restituivano payload VUOTO. Con addData(url, "Byte") i simboli si decodificano al primo
+  colpo su tutti e due i decoder.
+- **REGOLA**: un QR si verifica DECODIFICANDOLO con un decoder indipendente (pyzbar/zbar,
+  cv2.QRCodeDetector) e confrontando il payload con l'indirizzo atteso — mai fermarsi a
+  "l'SVG è renderizzato" o "la matrice è strutturata". Sonda pronta:
+  `.tools/sonda-qr-decode.js` (da AstaWeb: `node ../.tools/sonda-qr-decode.js`).

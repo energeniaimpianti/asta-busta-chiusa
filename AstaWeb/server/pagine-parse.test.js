@@ -31,3 +31,18 @@ for (const pagina of PAGINE) {
     });
   });
 }
+
+// Antigressione QR (30/08/2026): con la selezione automatica dei dati la libreria
+// vendored codifica l'URL in modalità alfanumerica e produce QR che i lettori NON
+// decodificano (zbar e OpenCV: payload vuoto). Il QR va sempre creato con
+// addData(url, "Byte"). Qui fermiamo almeno la regressione involontaria.
+test("pagina banditore: il QR viene creato con addData in modalità Byte", () => {
+  const html = fs.readFileSync(path.join(dirPubblica, "banditore.html"), "utf8");
+  assert.ok(
+    /addData\(\s*\w+\s*,\s*["']Byte["']\s*\)/.test(html),
+    'manca qr.addData(url, "Byte") prima di qr.make(): il QR diventerebbe illeggibile'
+  );
+  const iAdd = html.indexOf("addData(");
+  const iMake = html.indexOf(".make()");
+  assert.ok(iAdd >= 0 && iMake > iAdd, "addData deve precedere make()");
+});
