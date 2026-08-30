@@ -422,11 +422,16 @@ async function wiringSetup() {
   // indirizzi + QR
   try {
     const r = await (await fetch("/api/indirizzi")).json();
-    const url = r.ips.length ? `http://${r.ips[0]}:${r.porta}` : `http://localhost:${r.porta}`;
+    // se QUESTA pagina è stata aperta dal link del tunnel (https://...trycloudflare.com),
+    // l'indirizzo da dare ai partecipanti è il tunnel stesso — l'indirizzo LAN del
+    // computer non è raggiungibile da chi arriva da internet (e su reti aziendali
+    // nemmeno dai telefoni in Wi-Fi: firewall)
+    const viaTunnel = location.hostname.endsWith("trycloudflare.com");
+    const url = viaTunnel ? location.origin : (r.ips.length ? `http://${r.ips[0]}:${r.porta}` : `http://localhost:${r.porta}`);
     document.getElementById("indirizzi").innerHTML = `
       <div style="margin:8px 0;padding:12px;background:#132530;border:2px solid #2e86c1;border-radius:10px;">
         <div class="indirizzo" style="font-size:22px;word-break:break-all;user-select:all;cursor:pointer;" onclick="copiaIndirizzo('${url}', this)" title="tocca per copiare">${url}</div>
-        <div class="muto" style="margin-top:6px;font-size:12px;">👈 tocca per COPIARE — oppure inquadrane il QR sotto</div>
+        <div class="muto" style="margin-top:6px;font-size:12px;">${viaTunnel ? "👈 collega TUTTI con questo indirizzo (sei arrivato da internet)" : "👈 tocca per COPIARE — oppure inquadrane il QR sotto"}</div>
       </div>`;
     try {
       // versione 3 (più piccola, scansiona meglio) + margine 4 + correzione alta.
