@@ -476,6 +476,7 @@ class MotoreAsta {
  * Con meno di 4 offerte valide si dicono tutte.
  */
 const MASSIMO_OFFERTE_PRONUNCIATE = 4;
+const SOGLIA_SUSPENSE = 25; // sopra questo importo: annuncio con suspense
 
 function testoAnnuncio(r) {
   let t = `Asta chiusa per ${r.giocatore.nome}. `;
@@ -502,7 +503,12 @@ function testoAnnuncio(r) {
       t += "Pareggio in cima, spareggio. ";
       for (const o of r.spareggio) t += `${o.partecipante} ha offerto ${o.importo}. `;
     }
-    t += `${r.giocatore.nome} è aggiudicato a ${r.vincitore} per ${r.importoFinale} fantamilioni!`;
+    if (r.importoFinale >= SOGLIA_SUSPENSE) {
+      // PREMIO ALTO: suspense misurata (3 secondi extra, non di più)
+      t += `Attenzione... ${r.giocatore.nome}... è aggiudicato a ${r.vincitore}... per ${r.importoFinale} fantamilioni!`;
+    } else {
+      t += `${r.giocatore.nome} è aggiudicato a ${r.vincitore} per ${r.importoFinale} fantamilioni!`;
+    }
   }
   return t;
 }

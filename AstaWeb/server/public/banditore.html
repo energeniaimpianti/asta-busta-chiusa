@@ -284,8 +284,9 @@ async function wiringSetup() {
     const url = r.ips.length ? `http://${r.ips[0]}:${r.porta}` : `http://localhost:${r.porta}`;
     document.getElementById("indirizzi").innerHTML = `<span class="indirizzo">${url}</span>`;
     try {
-      const qr = qrcode(0, "M"); qr.make(url);
-      document.getElementById("qr").innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2 });
+      // versione 5 (abbondante per URL con porta) + margine 4 per scansione affidabile
+      const qr = qrcode(5, "M"); qr.make(url);
+      document.getElementById("qr").innerHTML = qr.createSvgTag({ cellSize: 6, margin: 4 });
     } catch (_) {}
   } catch (_) {}
 
@@ -399,9 +400,20 @@ function applicaVis() {
   const tot = r.offerteInOrdine.length + (r.spareggi > 0 ? r.spareggio.length + 1 : 1);
   if (rivelati >= tot - 1) {
     const esito = document.getElementById("esito");
-    if (esito) esito.innerHTML = r.nonVenduto
-      ? `<div class="nonvenduto">❌ Non venduto (${esc(r.motivoNonVenduto)})</div>`
-      : `<div class="vincitore">🏆 ${esc(r.giocatore.nome)} → ${esc(r.vincitore)} per ${r.importoFinale} FMM</div>${r.passi.length ? `<div class="muto centro">Passo: ${r.passi.map(esc).join(", ")}</div>` : ""}`;
+    if (!esito) return;
+    if (r.nonVenduto) {
+      esito.innerHTML = `<div class="nonvenduto">❌ Non venduto (${esc(r.motivoNonVenduto)})</div>`;
+    } else if (r.importoFinale >= 25 && !esito.dataset.suspenseFatta) {
+      // PREMIO ALTO: 2 secondi di suspense prima del vincitore
+      esito.dataset.suspenseFatta = "1";
+      esito.innerHTML = `<div style="text-align:center;font-size:28px;padding:16px;animation:pulsante 1s infinite alternate;">⏳</div>`;
+      setTimeout(() => {
+        esito.innerHTML = `<div class="vincitore" style="animation:vittoria 1.4s ease;">🏆 ${esc(r.giocatore.nome)} → ${esc(r.vincitore)} per ${r.importoFinale} FMM</div>${r.passi.length ? `<div class="muto centro">Passo: ${r.passi.map(esc).join(", ")}</div>` : ""}`;
+        delete esito.dataset.suspenseFatta;
+      }, 2000);
+    } else if (!esito.dataset.suspenseFatta) {
+      esito.innerHTML = `<div class="vincitore">🏆 ${esc(r.giocatore.nome)} → ${esc(r.vincitore)} per ${r.importoFinale} FMM</div>${r.passi.length ? `<div class="muto centro">Passo: ${r.passi.map(esc).join(", ")}</div>` : ""}`;
+    }
   }
 }
 
