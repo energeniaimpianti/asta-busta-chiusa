@@ -147,6 +147,35 @@ const COMMENTI_GENERALI = [
   "Gli altri che guardano e imparano!",
 ];
 
+// ---- Commenti: VITTORIE RISICATE (differenza ≤3 FMM) ----
+const COMMENTI_RISICATI = [
+  "Per il rotto della cuffia!",
+  "Roba da fotofinish!",
+  "Un fantamilione di differenza! Che botta!",
+  "Vinto all'ultimo fantamilione!",
+  "Manco il tempo di rilanciare!",
+  "Di misura, ma vinto!",
+  "Per una manciata di fantamilioni!",
+  "L'ha scampata bella!",
+  "Se l'è preso per un soffio!",
+  "Che ritmo, signore e signori!",
+  "Un soffio e se lo prendeva l'altro!",
+  "Il fato ha deciso per pochi spicci!",
+  "Vittoria risicata!",
+  "Manco il tempo di dire rilancio!",
+  "Si è aggiudicato per il rotto della... cuffia!",
+  "Pochi fantamilioni di scarto, ma conta il risultato!",
+  "Il cuore di {n} ha retto!",
+  "L'avversario ci è arrivato a un passo!",
+  "Che battaglia!",
+  "Guerriglia di fantamilioni!",
+  "Si vince per un pelo e si festeggia come un mondiale!",
+  "La differenza? Una miseria. Ma è sua!",
+  "Gladiatore! {n} non molla mai!",
+  "Ha vinto di misura ma ha vinto!",
+  "Un soffio, un battito di ciglia, e va a {n}!",
+];
+
 // ============================================================ UTILITÀ
 
 // pool anti-ripetizione: tiene memoria delle ultime frasi usate per categoria
@@ -226,6 +255,11 @@ function generaAggiudicazione(r) {
   const alto = p >= 25;
   const economico = p < 10;
 
+  // calcola il margine di vittoria (differenza tra le due offerte più alte)
+  const ordinate = [...r.offerteInOrdine].sort((a, b) => b.importo - a.importo);
+  const margine = ordinate.length >= 2 ? ordinate[0].importo - ordinate[1].importo : 999;
+  const risicato = margine >= 1 && margine <= 3; // vittoria per 1-3 FMM
+
   // numero casuale di offerte da leggere: 3 o 4
   const numOfferte = _numeroCasuale(3, 4);
   const daDire = r.offerteInOrdine.slice(-numOfferte);
@@ -250,10 +284,10 @@ function generaAggiudicazione(r) {
     }
   }
 
-  // 3) ELEMENTO INTERMEDIO (dipende dalla struttura e dal prezzo)
+  // 3) ELEMENTO INTERMEDIO (dipende dalla struttura, dal prezzo e dal margine)
   switch (struttura) {
     case 0: // CLASSICA: aggiudicazione separata
-      if (alto) t += _pick(SUSPENSE, "suspense") + " ";
+      if (alto || risicato) t += _pick(SUSPENSE, "suspense") + " ";
       t += _tmpl(_pick(AGGIUDICAZIONI, "aggiudicazione"), { giocatore: g, nome: n, prezzo: p });
       break;
     case 1: // INTEGRATA: l'ultima lettura include l'aggiudicazione
@@ -266,7 +300,8 @@ function generaAggiudicazione(r) {
       break;
     case 3: // COMMENTATA: aggiudicazione + commento simpatico
       t += _tmpl(_pick(AGGIUDICAZIONI, "aggiudicazione"), { giocatore: g, nome: n, prezzo: p }) + " ";
-      if (alto) t += _tmpl(_pick(COMMENTI_ALTI, "commentoAlto"), { nome: n, giocatore: g });
+      if (risicato) t += _tmpl(_pick(COMMENTI_RISICATI, "commentoRisicato"), { nome: n, giocatore: g });
+      else if (alto) t += _tmpl(_pick(COMMENTI_ALTI, "commentoAlto"), { nome: n, giocatore: g });
       else if (economico) t += _tmpl(_pick(COMMENTI_ECONOMICI, "commentoEco"), { nome: n, giocatore: g });
       else t += _tmpl(_pick(COMMENTI_GENERALI, "commentoGen"), { nome: n, giocatore: g });
       break;
@@ -278,7 +313,8 @@ function generaAggiudicazione(r) {
   // 4) COMMENTO FINALE (solo se non già dato nella struttura 3, e con probabilità 40%)
   if (struttura !== 3 && Math.random() < 0.4) {
     t += " ";
-    if (alto) t += _tmpl(_pick(COMMENTI_ALTI, "commentoAlto"), { nome: n, giocatore: g });
+    if (risicato) t += _tmpl(_pick(COMMENTI_RISICATI, "commentoRisicato"), { nome: n, giocatore: g });
+    else if (alto) t += _tmpl(_pick(COMMENTI_ALTI, "commentoAlto"), { nome: n, giocatore: g });
     else if (economico) t += _tmpl(_pick(COMMENTI_ECONOMICI, "commentoEco"), { nome: n, giocatore: g });
     else t += _tmpl(_pick(COMMENTI_GENERALI, "commentoGen"), { nome: n, giocatore: g });
   }
