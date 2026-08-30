@@ -236,10 +236,15 @@ async function postBin(url, buf, nomeFile, pin2) {
   return j;
 }
 
+let usoPoll = false, timerPoll = null, guardiaSse = null, erroriPoll = 0;
 function connetti() {
+  if (usoPoll) return; // già in polling di fallback (l'URL segue il PIN corrente)
   if (es) es.close();
+  if (timerPoll) { clearInterval(timerPoll); timerPoll = null; }
+  let arrivatoQualcosa = false;
   es = new EventSource("/api/eventi?pin=" + encodeURIComponent(pin));
   es.addEventListener("stato", (e) => {
+    arrivatoQualcosa = true;
     vista = JSON.parse(e.data);
     if (vista.preAvvio && vista.config) cfg = { ...vista.config };
     // il riepilogo lista arriva dal server anche dopo un ricaricamento della pagina
@@ -249,10 +254,41 @@ function connetti() {
   es.onerror = () => {
     // NON sostituire il DOM se l'utente sta digitando il PIN
     // (il ciclo riconnetti→errore→ridisegna cancellava il campo input)
-    if (!vista && !document.getElementById("pin")) {
-      $app.innerHTML = schermataPin("PIN errato o server irraggiungibile. Riprova.");
+    if (!arrivatoQualcosa && !vista) {
+      toast("PIN non accettato o server non raggiungibile");
+      if (!document.getElementById("pin")) {
+        $app.innerHTML = schermataPin("PIN errato o server irraggiungibile. Riprova.");
+      }
     }
   };
+  // guardia anti-buffering: se lo streaming non arriva entro 4 secondi
+  // (proxy/tunnel che blocca l'evento-stream), si passa al polling
+  clearTimeout(guardiaSse);
+  guardiaSse = setTimeout(() => { if (!arrivatoQualcosa && !vista) avviaPolling(); }, 4000);
+}
+function avviaPolling() {
+  usoPoll = true;
+  if (es) { es.close(); es = null; }
+  const scarica = async () => {
+    try {
+      const r = await fetch("/api/eventi?pin=" + encodeURIComponent(pin) + "&uno=1");
+      if (!r.ok) {
+        erroriPoll++;
+        if (erroriPoll === 3) toast("Connessione lenta o assente: continuo a riprovare");
+        return;
+      }
+      erroriPoll = 0;
+      const t = await r.text();
+      const m = t.match(/data: (.+)/);
+      if (!m) return;
+      vista = JSON.parse(m[1]);
+      if (vista.preAvvio && vista.config) cfg = { ...vista.config };
+      if (vista.preAvvio && vista.esitoLista && !esitoLista) esitoLista = riassuntoDaEsito(vista.esitoLista);
+      render();
+    } catch (_) { /* riprova al prossimo giro */ }
+  };
+  scarica();
+  timerPoll = setInterval(scarica, 2000);
 }
 
 function schermataPin(msg) {

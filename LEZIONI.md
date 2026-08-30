@@ -133,3 +133,22 @@ Nuove lezioni si AGGIUNGONO in fondo, mai si cancellano.
   cv2.QRCodeDetector) e confrontando il payload con l'indirizzo atteso — mai fermarsi a
   "l'SVG è renderizzato" o "la matrice è strutturata". Sonda pronta:
   `.tools/sonda-qr-decode.js` (da AstaWeb: `node ../.tools/sonda-qr-decode.js`).
+
+## 16 · SSE dietro tunnel/proxy può essere bufferizzato: sempre fallback polling
+
+- **Sintomo** (30/08, prova 3 telefoni): "Entra come banditore non fa nulla". Le pagine e le
+  API rispondevano via tunnel, il PIN era giusto: lo streaming SSE (/api/eventi) arrivava
+  al client come 200 OK ma il BODY non veniva MAI consegnato (nemmeno "retry:", nemmeno i
+  ping a 25 secondi). In locale tutto funzionava.
+- **Diagnosi**: mini-server SSE su porta separata + secondo tunnel → blocco confermato sul
+  percorso tunnel/rete (quick tunnel Cloudflare e/o filtro aziendale in uscita): le risposte
+  CHIUSE (JSON, pagine) passano, lo stream infinito no. Anche --no-chunked-encoding non cambia.
+- **FIX strutturale**: endpoint `?uno=1` su /api/eventi (una vista e risposta chiusa) +
+  fallback automatico nel client: se entro 4s dal login nessun evento è arrivato, la pagina
+  passa da sola a polling ogni 2s (risposte chiuse = passano sempre). Contro: massimo 2s di
+  ritardo sugli aggiornamenti, solo quando serve.
+- **REGOLA**: un'app live dietro proxy va collaudata sul PERCORSO REALE (tunnel), non solo in
+  localhost; e ogni canale push (SSE/WebSocket) vuole un fallback a polling verificato.
+  Sonda: `.tools/sonda-polling.js` (simula il proxy muto e verifica il fallback nel browser).
+- **Corollario UX**: il fallimento silenzioso della connessione era INVISIBILE all'utente
+  (onerror non ridisegnava per non cancellare il campo PIN): ora c'è un toast di errore.

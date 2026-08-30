@@ -848,9 +848,10 @@ function creaServer(opzioni = {}) {
     avviata: false,
     motore: new MotoreAsta(),
   };
-  // ripresa sessione precedente
+  // ripresa sessione precedente (anche col solo listone caricato: il setup
+  // fatto dal banditore non deve perdersi per un riavvio senza iscritti)
   const salvata = persistenza.carica();
-  if (salvata && (salvata.avviata || (salvata.partecipantiRegistrati && salvata.partecipantiRegistrati.length))) {
+  if (salvata && (salvata.avviata || salvata.esitoLista || (salvata.partecipantiRegistrati && salvata.partecipantiRegistrati.length))) {
     sessione.pin = salvata.pin || sessione.pin;
     sessione.config = salvata.config || sessione.config;
     sessione.lista = salvata.lista || [];
@@ -861,6 +862,9 @@ function creaServer(opzioni = {}) {
   }
 
   const clienti = new Set(); // {res, ruolo:'banditore'|pid, pid}
+  // presenze dei client in POLLING di fallback (?uno=1): chiave -> ultimo istante visto.
+  // Servono per il conteggio "telefoni connessi" quando lo streaming è bloccato da un proxy.
+  const presenzePoll = new Map();
 
   // anti-forzatura del PIN (4 cifre, l'unica barriera anche sul tunnel pubblico):
   // oltre 8 PIN errati dallo stesso IP in 60 secondi → 60 secondi di rifiuto (429)
@@ -894,7 +898,11 @@ function creaServer(opzioni = {}) {
       avviata: sessione.avviata,
       fase: s ? s.fase : null,
       config: sessione.config,
-      connessi: [...clienti].map((c) => c.ruolo),  // 'banditore' | 'partecipante'
+      connessi: [...clienti].map((c) => c.ruolo).concat(
+        [...presenzePoll.entries()]
+          .filter(([, ts]) => Date.now() - ts < 7000)
+          .map(([k]) => (k === "banditore" ? "banditore" : "partecipante"))
+      ),  // 'banditore' | 'partecipante'
       statistiche: sessione.avviata && s ? sessione.motore.statistiche() : null,
       codaRimanente: s ? s.coda.length : 0,
       roundId: s ? s.roundId : 0,
@@ -1056,11 +1064,17 @@ function creaServer(opzioni = {}) {
         if (!reg) { res.end(); return; }
         cliente = { res, ruolo: "partecipante", pid };
       } else { res.end(); return; }
+      const vista = cliente.ruolo === "banditore" ? vistaBanditore() : vistaPartecipante(cliente.pid);
+      res.write(`event: stato\ndata: ${JSON.stringify(vista)}\n\n`);
+      // ?uno=1: UNA vista e chiudi (risposta finita = passa anche dai proxy che
+      // bufferizzano lo streaming: è il percorso del polling di fallback dei telefoni)
+      if (u.searchParams.get("uno") === "1") {
+        presenzePoll.set(cliente.ruolo === "banditore" ? "banditore" : "p" + cliente.pid, Date.now());
+        return res.end();
+      }
       cliente.tick = setInterval(() => { try { res.write(": ping\n\n"); } catch (_) {} }, 15000);
       clienti.add(cliente);
       res.on("close", () => { clearInterval(cliente.tick); clienti.delete(cliente); });
-      const vista = cliente.ruolo === "banditore" ? vistaBanditore() : vistaPartecipante(cliente.pid);
-      res.write(`event: stato\ndata: ${JSON.stringify(vista)}\n\n`);
       return;
     }
 

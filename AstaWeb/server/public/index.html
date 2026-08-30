@@ -116,14 +116,40 @@ async function post(url, corpo) {
   return j;
 }
 
+let usoPoll = false, timerPoll = null, guardiaSse = null;
 function connetti() {
+  if (usoPoll) return; // già in polling di fallback (l'URL segue il pid corrente)
   if (es) { es.close(); es = null; }
+  if (timerPoll) { clearInterval(timerPoll); timerPoll = null; }
+  let arrivatoQualcosa = false;
   es = new EventSource("/api/eventi?pid=" + pid);
   es.addEventListener("stato", (e) => {
+    arrivatoQualcosa = true;
     vista = JSON.parse(e.data);
     render();
   });
   es.onerror = () => { /* EventSource si riconnette da solo */ };
+  // guardia anti-buffering: se lo streaming non arriva entro 4 secondi
+  // (proxy/tunnel che blocca l'evento-stream), si passa al polling
+  clearTimeout(guardiaSse);
+  guardiaSse = setTimeout(() => { if (!arrivatoQualcosa && !vista) avviaPolling(); }, 4000);
+}
+function avviaPolling() {
+  usoPoll = true;
+  if (es) { es.close(); es = null; }
+  const scarica = async () => {
+    try {
+      const r = await fetch("/api/eventi?pid=" + pid + "&uno=1");
+      if (!r.ok) return;
+      const t = await r.text();
+      const m = t.match(/data: (.+)/);
+      if (!m) return;
+      vista = JSON.parse(m[1]);
+      render();
+    } catch (_) { /* riprova al prossimo giro */ }
+  };
+  scarica();
+  timerPoll = setInterval(scarica, 2000);
 }
 
 async function entra(nome) {

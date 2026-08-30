@@ -794,6 +794,68 @@ test("server: export Excel multi-foglio — 5 fogli e contenuti verificati in le
 
 function piattaCsv(s) { return s.toLowerCase(); }
 
+test("server: evento singolo ?uno=1 — una vista e risposta CHIUSA (polling dietro proxy che bufferizza lo streaming)", async () => {
+  const dirTmp = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "astaweb-"));
+  const server = creaServer({ dirDati: dirTmp });
+  const porta = await ascolta(server);
+  const pin = server.sessione.pin;
+  try {
+    const tA = (await chiama(porta, "/api/entra", "POST", JSON.stringify({ nome: "Alfa" }))).json.token;
+    await chiama(porta, "/api/entra", "POST", JSON.stringify({ nome: "Beta" }));
+    await chiama(porta, "/api/lista", "POST", Buffer.from(csvDemo), { "x-pin": pin });
+    await chiama(porta, "/api/avvia", "POST", JSON.stringify({ pin }));
+
+    // col PIN: vista banditore, e la risposta TERMINA (chiama() attende la fine)
+    const rb = await chiama(porta, "/api/eventi?pin=" + pin + "&uno=1");
+    assert.strictEqual(rb.stato, 200, "poll banditore");
+    assert.ok(rb.testo.includes("event: stato"), "formato evento presente");
+    const vb = JSON.parse(rb.testo.match(/data: (.+)/)[1]);
+    assert.strictEqual(vb.banditore, true, "vista banditore con il PIN");
+    assert.ok(vb.giocatore && vb.giocatore.nome, "la vista contiene il giocatore corrente");
+
+    // col pid: vista partecipante
+    const rp = await chiama(porta, "/api/eventi?pid=1&uno=1");
+    assert.strictEqual(rp.stato, 200, "poll partecipante");
+    const vp = JSON.parse(rp.testo.match(/data: (.+)/)[1]);
+    assert.strictEqual(vp.mioNome, "Alfa", "vista partecipante col pid");
+
+    // PIN errato resta rifiutato anche in polling
+    assert.strictEqual((await chiama(porta, "/api/eventi?pin=0000&uno=1")).stato, 403);
+
+    // il conteggio connessi vede i poller recenti
+    const rc = await chiama(porta, "/api/eventi?pid=1&uno=1");
+    const vc = JSON.parse(rc.testo.match(/data: (.+)/)[1]);
+    assert.ok((vc.connessi || []).includes("partecipante"), "poller contato tra i connessi: " + JSON.stringify(vc.connessi));
+  } finally {
+    if (server.closeAllConnections) server.closeAllConnections();
+    await new Promise((ok) => server.close(ok));
+    fs.rmSync(dirTmp, { recursive: true, force: true });
+  }
+});
+
+test("server: il listone caricato sopravvive a un riavvio anche senza iscritti", async () => {
+  const dirTmp = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "astaweb-"));
+  const server = creaServer({ dirDati: dirTmp });
+  const porta = await ascolta(server);
+  const pin = server.sessione.pin;
+  try {
+    await chiama(porta, "/api/lista", "POST", Buffer.from(csvDemo), { "x-pin": pin, "x-nome-file": "lista.csv" });
+    await new Promise((ok) => server.close(ok));
+    const server2 = creaServer({ dirDati: dirTmp });
+    const porta2 = await ascolta(server2);
+    try {
+      const v = await primaVistaSse(porta2, "pin=" + server2.sessione.pin);
+      assert.ok(v.esitoLista && v.esitoLista.giocatori.length === 50, "esitoLista ripristinato dopo riavvio senza iscritti");
+      assert.deepStrictEqual(v.partecipantiRegistrati, []);
+    } finally {
+      if (server2.closeAllConnections) server2.closeAllConnections();
+      await new Promise((ok) => server2.close(ok));
+    }
+  } finally {
+    fs.rmSync(dirTmp, { recursive: true, force: true });
+  }
+});
+
 test("server: pagina partecipante e banditore servite, vendor QR presente", async () => {
   const dirTmp = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "astaweb-"));
   const server = creaServer({ dirDati: dirTmp });
