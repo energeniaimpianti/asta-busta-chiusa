@@ -108,10 +108,11 @@ function popolaVoci() {
   sel.innerHTML = vs.length
     ? vs.map((v) => `<option value="${v.name}" ${attuale && v.name === attuale.name ? "selected" : ""}>${v.name}</option>`).join("")
     : `<option value="">(nessuna voce italiana trovata)</option>`;
+  // le voci "Online (Natural)" di Edge si caricano in ritardo: riprova dopo 2s se il menu è vuoto
+  if (!vs.length) setTimeout(() => { if (document.getElementById("voce-select")) popolaVoci(); }, 2000);
 }
 if (window.speechSynthesis) {
-  speechSynthesis.onvoiceschanged = popolaVoci;
-  setTimeout(popolaVoci, 300);
+  speechSynthesis.onvoiceschanged = () => { if (document.getElementById("voce-select")) popolaVoci(); };
 }
 function barraVoce() {
   return `<div class="barra-voce">🎙 <label for="voce-select">Voce</label>
@@ -176,12 +177,16 @@ function schermataPin(msg) {
 
 function render() {
   if (!vista) return;
-  if (vista.preAvvio) { $app.innerHTML = schermataSetup(); wiringSetup(); return; }
-  if (vista.fase === "FINE") { $app.innerHTML = schermataFine(); return; }
+  if (vista.preAvvio) {
+    $app.innerHTML = schermataSetup() + barraVoce();
+    wiringSetup(); popolaVoci(); return;
+  }
+  if (vista.fase === "FINE") { $app.innerHTML = schermataFine() + barraVoce(); popolaVoci(); return; }
   let html = intestazione() + barraVoce();
   html += (vista.fase === "RIVELAZIONE") ? pannelloRivelazione() : (pannelloGiocatore() + pannelloPartecipanti() + pannelloAzioni());
   html += `<details><summary>📋 Squadre (aggiornate in tempo reale)</summary>${tabellaSquadre()}</details>`;
   $app.innerHTML = html;
+  popolaVoci();
   if (vista.fase === "RIVELAZIONE") avviaRivelazione();
 }
 
@@ -286,10 +291,14 @@ async function wiringSetup() {
   try {
     const r = await (await fetch("/api/indirizzi")).json();
     const url = r.ips.length ? `http://${r.ips[0]}:${r.porta}` : `http://localhost:${r.porta}`;
-    document.getElementById("indirizzi").innerHTML = `<span class="indirizzo">${url}</span>`;
+    document.getElementById("indirizzi").innerHTML = `
+      <div style="margin:8px 0;padding:12px;background:#132530;border:2px solid #2e86c1;border-radius:10px;">
+        <div class="indirizzo" style="font-size:22px;word-break:break-all;user-select:all;cursor:pointer;" onclick="navigator.clipboard.writeText('${url}').then(()=>this.style.background='#1b5e20').catch(()=>{});" title="clicca per copiare">${url}</div>
+        <div class="muto" style="margin-top:6px;font-size:12px;">👈 clicca per COPIARE — oppure inquadrane il QR sotto</div>
+      </div>`;
     try {
-      // versione 5 (abbondante per URL con porta) + margine 4 per scansione affidabile
-      const qr = qrcode(5, "M"); qr.make(url);
+      // versione 3 (più piccola, scansiona meglio) + margine 4 + correzione alta
+      const qr = qrcode(3, "Q"); qr.make(url);
       document.getElementById("qr").innerHTML = qr.createSvgTag({ cellSize: 6, margin: 4 });
     } catch (_) {}
   } catch (_) {}
