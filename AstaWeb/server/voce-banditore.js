@@ -256,7 +256,12 @@ function generaNonVenduto(r) {
 function generaAggiudicazione(r) {
   const g = r.giocatore.nome, n = r.vincitore, p = r.importoFinale;
   const alto = p >= 25, economico = p < 10;
-  const ord = [...r.offerteInOrdine].sort((a, b) => b.importo - a.importo);
+
+  // FIX #1: margine calcolato dall'ULTIMO round disputato (spareggio se esiste)
+  const ultimoRound = (r.spareggi > 0 && r.spareggio && r.spareggio.length >= 2)
+    ? r.spareggio
+    : r.offerteInOrdine;
+  const ord = [...ultimoRound].sort((a, b) => b.importo - a.importo);
   const margine = ord.length >= 2 ? ord[0].importo - ord[1].importo : 999;
   const risicato = margine >= 1 && margine <= 3;
 
@@ -265,9 +270,33 @@ function generaAggiudicazione(r) {
   let t = _tmpl(_pick(APERTURE, "ap"), { giocatore: g }) + " ";
 
   if (struttura === 4) {
-    for (const o of daDire) t += `${o.partecipante}: ${o.importo}. `;
+    // FIX #3: struttura TELEGRAFICA (solo i due valori finali, niente letture)
+    const ultime2 = r.offerteInOrdine.slice(-2);
+    for (const o of ultime2) t += `${o.partecipante}: ${o.importo}. `;
   } else {
     for (const o of daDire) t += _tmpl(_pick(LETTURE, "le"), { nome: o.partecipante, prezzo: o.importo }) + " ";
+  }
+
+  // FIX #4: se ci sono passi e poche offerte, menziona chi passa
+  const numPassi = (r.passi || []).length;
+  const numValide = r.offerteInOrdine.filter(o => o.importo > 0).length;
+  if (numPassi > 0 && numValide <= 2) {
+    t += numPassi === 1 ? "Gli altri passano. " : `Tutti gli altri passano (${numPassi}). `;
+  }
+
+  // helper per i commenti (FIX #2: alto+risicato = entrambi)
+  function commentiPer(n2, g2, p2) {
+    let c = "";
+    if (risicato) c += _tmpl(_pick(COMMENTI_RISICATI, "ri"), { nome: n2, giocatore: g2, prezzo: p2 });
+    if (alto) {
+      if (c) c += " ";
+      c += _tmpl(_pick(COMMENTI_ALTI, "al"), { nome: n2, giocatore: g2, prezzo: p2 });
+    }
+    if (!risicato && !alto) {
+      if (economico) c += _tmpl(_pick(COMMENTI_ECONOMICI, "ec"), { nome: n2, giocatore: g2, prezzo: p2 });
+      else c += _tmpl(_pick(COMMENTI_GENERALI, "ge"), { nome: n2, giocatore: g2, prezzo: p2 });
+    }
+    return c;
   }
 
   switch (struttura) {
@@ -284,22 +313,17 @@ function generaAggiudicazione(r) {
       break;
     case 3:
       t += _tmpl(_pick(AGGIUDICAZIONI, "ag"), { giocatore: g, nome: n, prezzo: p }) + " ";
-      if (risicato) t += _tmpl(_pick(COMMENTI_RISICATI, "ri"), { nome: n, giocatore: g, prezzo: p });
-      else if (alto) t += _tmpl(_pick(COMMENTI_ALTI, "al"), { nome: n, giocatore: g, prezzo: p });
-      else if (economico) t += _tmpl(_pick(COMMENTI_ECONOMICI, "ec"), { nome: n, giocatore: g, prezzo: p });
-      else t += _tmpl(_pick(COMMENTI_GENERALI, "ge"), { nome: n, giocatore: g, prezzo: p });
+      t += commentiPer(n, g, p);
       break;
     case 4:
-      t += _tmpl(_pick(AGGIUDICAZIONI_INTEGRATE, "in"), { giocatore: g, nome: n, prezzo: p });
+      // TELEGRAFICA: aggiudicazione secca
+      t += `${g}: ${n}! ${p}!`;
       break;
   }
 
-  if (struttura !== 3 && Math.random() < 0.4) {
+  if (struttura !== 3 && struttura !== 4 && Math.random() < 0.4) {
     t += " ";
-    if (risicato) t += _tmpl(_pick(COMMENTI_RISICATI, "ri"), { nome: n, giocatore: g, prezzo: p });
-    else if (alto) t += _tmpl(_pick(COMMENTI_ALTI, "al"), { nome: n, giocatore: g, prezzo: p });
-    else if (economico) t += _tmpl(_pick(COMMENTI_ECONOMICI, "ec"), { nome: n, giocatore: g, prezzo: p });
-    else t += _tmpl(_pick(COMMENTI_GENERALI, "ge"), { nome: n, giocatore: g, prezzo: p });
+    t += commentiPer(n, g, p);
   }
 
   return t;
