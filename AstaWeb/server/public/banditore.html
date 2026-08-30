@@ -154,7 +154,11 @@ function connetti() {
     render();
   });
   es.onerror = () => {
-    if (!vista) { $app.innerHTML = schermataPin("PIN errato o server irraggiungibile. Riprova."); }
+    // NON sostituire il DOM se l'utente sta digitando il PIN
+    // (il ciclo riconnetti→errore→ridisegna cancellava il campo input)
+    if (!vista && !document.getElementById("pin")) {
+      $app.innerHTML = schermataPin("PIN errato o server irraggiungibile. Riprova.");
+    }
   };
 }
 
@@ -521,9 +525,9 @@ window.addEventListener("beforeunload", (e) => {
   if (vista && !vista.preAvvio && vista.fase !== "FINE") { e.preventDefault(); e.returnValue = ""; }
 });
 
-// avvio
-if (pin) connetti();
-else $app.innerHTML = schermataPin();
+// avvio: mostra SEMPRE la schermata PIN (non collegarsi automaticamente con un PIN vecchio)
+// se il PIN salvato è corretto, basta premere Invio/cliccare per entrare
+$app.innerHTML = schermataPin(pin ? "PIN salvato: " + pin + " (premi Entra per ricollegarti)" : "");
 </script>
 </body>
 </html>
