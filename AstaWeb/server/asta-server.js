@@ -1249,6 +1249,7 @@ function creaServer(opzioni = {}) {
       sessione.partecipantiRegistrati = [];
       sessione.lista = [];
       sessione.esitoLista = null;
+      sessione.config = { ...CONFIG_DEFAULT }; // "cancella tutto": anche le regole tornano default
       persistenza.azzera();
       broadcast();
       return json(res, 200, { ok: true });

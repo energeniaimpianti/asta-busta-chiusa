@@ -152,3 +152,19 @@ Nuove lezioni si AGGIUNGONO in fondo, mai si cancellano.
   Sonda: `.tools/sonda-polling.js` (simula il proxy muto e verifica il fallback nel browser).
 - **Corollario UX**: il fallimento silenzioso della connessione era INVISIBILE all'utente
   (onerror non ridisegnava per non cancellare il campo PIN): ora c'è un toast di errore.
+
+## 17 · Stato residuo tra sessioni: i test (e le aste) devono partire da config NOTE
+
+- **Sintomo** (30/08 notte): E2E falliva sempre su "busta consegnata" SOLO contro il server
+  live, mai su server vergine. Diagnosi con click-logger nella pagina: l'offerta 44 veniva
+  rifiutata perché min=45 — la config del live aveva "Quotazione base = minimo" rimasta da
+  una sessione precedente ("Nuova asta" non la ripristinava).
+- **Fix**: (1) /api/nuova ora riporta anche la config ai default ("cancella tutto" dice la
+  pagina, e così deve essere); (2) l'E2E fissa la config voluta via API prima di partire:
+  un collaudo non deve dipendere da stato pre-esistente del bersaglio.
+- **Caso gemello dello stesso vizio**: QR con versione FISSA (3) + URL del tunnel (~50
+  caratteri) → qr.make() in errore, INGHIOTTITO dal catch silenzioso → QR assente su schermo
+  (visto dal vivo dal banditore). Fix: versione AUTOMATICA (0) + antigressione nel test.
+- **REGOLA**: ogni "cancella/ricomincia" deve tornare davvero allo stato iniziale (config
+  compresa); ogni test end-to-end dichiara le proprie precondizioni invece di ereditarle;
+  e i catch vuoti su funzionalità visibili all'utente (QR) meritano almeno un log.

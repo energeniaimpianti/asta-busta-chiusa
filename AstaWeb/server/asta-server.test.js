@@ -856,6 +856,29 @@ test("server: il listone caricato sopravvive a un riavvio anche senza iscritti",
   }
 });
 
+test("server: «Nuova asta» ripristina anche le regole default (config residua non deve influire)", async () => {
+  const dirTmp = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "astaweb-"));
+  const server = creaServer({ dirDati: dirTmp });
+  const porta = await ascolta(server);
+  const pin = server.sessione.pin;
+  try {
+    // attiva una regola non-default e avvia un mini-round
+    await chiama(porta, "/api/config", "POST", JSON.stringify({ pin, config: { baseComeMinimo: true } }));
+    await chiama(porta, "/api/entra", "POST", JSON.stringify({ nome: "Alfa" }));
+    await chiama(porta, "/api/lista", "POST", Buffer.from(csvDemo), { "x-pin": pin });
+    await chiama(porta, "/api/avvia", "POST", JSON.stringify({ pin }));
+    assert.strictEqual((await chiama(porta, "/api/nuova", "POST", JSON.stringify({ pin }))).stato, 200);
+    const v = await primaVistaSse(porta, "pin=" + pin);
+    assert.strictEqual(v.config.baseComeMinimo, false, "baseComeMinimo tornato default dopo nuova");
+    assert.strictEqual(v.config.budgetIniziale, 500, "budget tornato default");
+    assert.deepStrictEqual(v.partecipantiRegistrati, [], "iscritti azzerati");
+  } finally {
+    if (server.closeAllConnections) server.closeAllConnections();
+    await new Promise((ok) => server.close(ok));
+    fs.rmSync(dirTmp, { recursive: true, force: true });
+  }
+});
+
 test("server: pagina partecipante e banditore servite, vendor QR presente", async () => {
   const dirTmp = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "astaweb-"));
   const server = creaServer({ dirDati: dirTmp });

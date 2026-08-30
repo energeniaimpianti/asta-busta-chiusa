@@ -36,13 +36,14 @@ for (const pagina of PAGINE) {
 // vendored codifica l'URL in modalità alfanumerica e produce QR che i lettori NON
 // decodificano (zbar e OpenCV: payload vuoto). Il QR va sempre creato con
 // addData(url, "Byte"). Qui fermiamo almeno la regressione involontaria.
-test("pagina banditore: il QR viene creato con addData in modalità Byte", () => {
+test("pagina banditore: il QR viene creato con versione automatica e addData in modalità Byte", () => {
   const html = fs.readFileSync(path.join(dirPubblica, "banditore.html"), "utf8");
   assert.ok(
-    /addData\(\s*\w+\s*,\s*["']Byte["']\s*\)/.test(html),
-    'manca qr.addData(url, "Byte") prima di qr.make(): il QR diventerebbe illeggibile'
+    /qrcode\(0\s*,\s*["']Q["']\)/.test(html),
+    "il QR deve usare versione automatica (0): una versione fissa piccola esplode con l'URL del tunnel"
   );
-  const iAdd = html.indexOf("addData(");
-  const iMake = html.indexOf(".make()");
-  assert.ok(iAdd >= 0 && iMake > iAdd, "addData deve precedere make()");
+  assert.ok(
+    /qr\.addData\(\s*\w+\s*,\s*["']Byte["']\s*\)[\s\S]{0,20}qr\.make\(\)/.test(html),
+    'manca la sequenza qr.addData(url, "Byte") subito prima di qr.make(): il QR diventerebbe illeggibile'
+  );
 });

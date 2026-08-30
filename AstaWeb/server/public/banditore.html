@@ -237,6 +237,19 @@ async function postBin(url, buf, nomeFile, pin2) {
 }
 
 let usoPoll = false, timerPoll = null, guardiaSse = null, erroriPoll = 0;
+let _siglaVista = "";
+// una sola via d'ingresso per le viste (SSE o polling): se la vista NON è
+// cambiata la pagina non si ridisegna (niente sfarfallio, il form resta com'è)
+function riceviVista(v) {
+  const sigla = JSON.stringify(v);
+  if (sigla === _siglaVista) return;
+  _siglaVista = sigla;
+  vista = v;
+  if (vista.preAvvio && vista.config) cfg = { ...vista.config };
+  // il riepilogo lista arriva dal server anche dopo un ricaricamento della pagina
+  if (vista.preAvvio && vista.esitoLista && !esitoLista) esitoLista = riassuntoDaEsito(vista.esitoLista);
+  render();
+}
 function connetti() {
   if (usoPoll) return; // già in polling di fallback (l'URL segue il PIN corrente)
   if (es) es.close();
@@ -245,11 +258,7 @@ function connetti() {
   es = new EventSource("/api/eventi?pin=" + encodeURIComponent(pin));
   es.addEventListener("stato", (e) => {
     arrivatoQualcosa = true;
-    vista = JSON.parse(e.data);
-    if (vista.preAvvio && vista.config) cfg = { ...vista.config };
-    // il riepilogo lista arriva dal server anche dopo un ricaricamento della pagina
-    if (vista.preAvvio && vista.esitoLista && !esitoLista) esitoLista = riassuntoDaEsito(vista.esitoLista);
-    render();
+    riceviVista(JSON.parse(e.data));
   });
   es.onerror = () => {
     // NON sostituire il DOM se l'utente sta digitando il PIN
@@ -281,10 +290,7 @@ function avviaPolling() {
       const t = await r.text();
       const m = t.match(/data: (.+)/);
       if (!m) return;
-      vista = JSON.parse(m[1]);
-      if (vista.preAvvio && vista.config) cfg = { ...vista.config };
-      if (vista.preAvvio && vista.esitoLista && !esitoLista) esitoLista = riassuntoDaEsito(vista.esitoLista);
-      render();
+      riceviVista(JSON.parse(m[1]));
     } catch (_) { /* riprova al prossimo giro */ }
   };
   scarica();
@@ -434,11 +440,11 @@ async function wiringSetup() {
         <div class="muto" style="margin-top:6px;font-size:12px;">${viaTunnel ? "👈 collega TUTTI con questo indirizzo (sei arrivato da internet)" : "👈 tocca per COPIARE — oppure inquadrane il QR sotto"}</div>
       </div>`;
     try {
-      // versione 3 (più piccola, scansiona meglio) + margine 4 + correzione alta.
-      // addData in modalità "Byte": con la selezione AUTOMATICA la libreria
-      // codifica l'URL in modalità alfanumerica e produce simboli che molti
-      // lettori NON decodificano (verificato con zbar e OpenCV: payload vuoto).
-      const qr = qrcode(3, "Q");
+      // versione AUTOMATICA (la più piccola che contiene l'indirizzo: una versione
+      // fissa piccola va in errore col link del tunnel, ~50 caratteri) + dati in
+      // modalità "Byte" (la selezione automatica di modalità produce QR che molti
+      // lettori non decodificano: verificato con zbar e OpenCV, payload vuoto)
+      const qr = qrcode(0, "Q");
       qr.addData(url, "Byte");
       qr.make();
       document.getElementById("qr").innerHTML = qr.createSvgTag({ cellSize: 6, margin: 4 });

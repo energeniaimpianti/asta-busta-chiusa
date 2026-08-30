@@ -117,6 +117,16 @@ async function post(url, corpo) {
 }
 
 let usoPoll = false, timerPoll = null, guardiaSse = null;
+let _siglaVista = "";
+// una sola via d'ingresso per le viste (SSE o polling): se la vista NON è
+// cambiata la pagina non si ridisegna (niente sfarfallio, il pad digitato resta)
+function riceviVista(v) {
+  const sigla = JSON.stringify(v);
+  if (sigla === _siglaVista) return;
+  _siglaVista = sigla;
+  vista = v;
+  render();
+}
 function connetti() {
   if (usoPoll) return; // già in polling di fallback (l'URL segue il pid corrente)
   if (es) { es.close(); es = null; }
@@ -125,8 +135,7 @@ function connetti() {
   es = new EventSource("/api/eventi?pid=" + pid);
   es.addEventListener("stato", (e) => {
     arrivatoQualcosa = true;
-    vista = JSON.parse(e.data);
-    render();
+    riceviVista(JSON.parse(e.data));
   });
   es.onerror = () => { /* EventSource si riconnette da solo */ };
   // guardia anti-buffering: se lo streaming non arriva entro 4 secondi
@@ -144,8 +153,7 @@ function avviaPolling() {
       const t = await r.text();
       const m = t.match(/data: (.+)/);
       if (!m) return;
-      vista = JSON.parse(m[1]);
-      render();
+      riceviVista(JSON.parse(m[1]));
     } catch (_) { /* riprova al prossimo giro */ }
   };
   scarica();

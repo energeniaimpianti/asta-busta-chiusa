@@ -14,7 +14,9 @@ const puppeteer = require("puppeteer-core");
 const { unzip } = require("./server/asta-server.js");
 
 const CHROME = "C:/Program Files/Google/Chrome/Application/chrome.exe";
-const BASE = "http://localhost:8090";
+// BASE sovrascrivibile: con BASE=https://...trycloudflare.com il collaudo passa
+// dal tunnel REALE (il percorso dei telefoni), non solo da localhost
+const BASE = process.env.BASE || "http://localhost:8090";
 const PIN = process.env.PIN;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -48,6 +50,9 @@ const ok = (msg) => { CHECK++; console.log("OK " + msg); };
   const dialoghi = [];
   pagB.on('pageerror', (e) => console.log('PAGEERROR B:', e.message));
   pagA.on('pageerror', (e) => console.log('PAGEERROR A:', e.message));
+  // tracciamento rete del partecipante per la diagnosi (stampato solo se il test fallisce)
+  const reteB = [];
+  pagB.on('response', (r) => { if (r.url().includes('/api/')) reteB.push(r.url().replace(BASE, '') + ' -> ' + r.status); });
   pagA.on("dialog", async (d) => { dialoghi.push({ tipo: d.type(), msg: d.message() }); await d.accept(); });
 
   const testo = (p) => p.evaluate(() => document.body.innerText);
@@ -61,6 +66,9 @@ const ok = (msg) => { CHECK++; console.log("OK " + msg); };
     // sessione pulita + preparazione via API (l'UI di tutto il resto è collaudata sotto)
     const rNuova = await api("/api/nuova", JSON.stringify({ pin: PIN }));
     assert(rNuova.stato === 200, "nuova sessione: " + JSON.stringify(rNuova.j));
+    // regole DEFAULT esplicite: il test non deve dipendere dalla config residua del server
+    const rCfg = await api("/api/config", JSON.stringify({ pin: PIN, config: { baseComeMinimo: false, regolaResto: true, budgetIniziale: 500 } }));
+    assert(rCfg.stato === 200, "config default: " + JSON.stringify(rCfg.j));
     for (const nome of ["Bruno", "Carlo", "Dario", "Enzo", "Franco", "Gino"]) {
       const r = await api("/api/entra", JSON.stringify({ nome }));
       assert(r.stato === 200, "registrazione " + nome);
@@ -93,7 +101,8 @@ const ok = (msg) => { CHECK++; console.log("OK " + msg); };
     let tA = await testo(pagA);
     assert(tA.includes("Iscritti (8)"), "8 iscritti nella pagina banditore: " + (tA.match(/Iscritti \(\d+\)/) || ["?"])[0]);
     assert(tA.includes("lista-demo.csv") && tA.includes("12 giocatori"), "lista caricata visibile al banditore");
-    assert((await pagA.$$("#qr svg")).length === 1, "QR renderizzato");
+    // via tunnel il fetch degli indirizzi è più lento: si ATTENDE il QR, non si pretende subito
+    await pagA.waitForSelector("#qr svg", { timeout: 10000 });
     ok("setup banditore: iscritti, lista, QR");
     // modalità telefonino: toggle voce presente, attivo di default
     const toggle = await pagA.$eval("#voce-attiva", (c) => ({ checked: c.checked, visibile: !!c.offsetParent }));
@@ -124,7 +133,13 @@ const ok = (msg) => { CHECK++; console.log("OK " + msg); };
     ok("partecipante: nome e ruolo, NESSUNA quotazione");
     await pagB.screenshot({ path: "../.tools/e2e_partecipante_asta.png" });
 
-    // busta di Giovanni: 44
+    // busta di Giovanni: 44 (il click-logger diagnostico resta: se un giorno il
+    // test fallisce, mostra cifra e minimi/massimi al momento del tap)
+    await pagB.evaluate(() => {
+      window.__clicks = [];
+      document.addEventListener("click", (e) => window.__clicks.push({ t: e.target.id || e.target.tagName, cifra: typeof cifra !== "undefined" ? cifra : "?", minmax: typeof vista !== "undefined" && vista ? (vista.minOfferta + "/" + vista.maxOfferta) : "vista-nulla" }), false);
+      window.addEventListener("unhandledrejection", (e) => console.error("UNHANDLED:", e.reason && (e.reason.stack || e.reason.message || String(e.reason))));
+    });
     await pagB.click('.pad button[data-t="4"]');
     await pagB.click('.pad button[data-t="4"]');
     await pagB.click("#consegna");
@@ -284,6 +299,9 @@ const ok = (msg) => { CHECK++; console.log("OK " + msg); };
     console.error(e.message);
     try { console.log("--- banda A ---\n" + (await testo(pagA)).slice(0, 600)); } catch (_) {}
     try { console.log("--- banda B ---\n" + (await testo(pagB)).slice(0, 600)); } catch (_) {}
+    try { console.log("--- stato JS B ---\n" + await pagB.evaluate(() => JSON.stringify({ fase: vista && vista.fase, mioStato: vista && vista.mioStato, cifra: typeof cifra !== "undefined" ? cifra : "?", usoPoll: typeof usoPoll !== "undefined" ? usoPoll : "?" }))); } catch (_) {}
+    try { console.log("--- click ricevuti da B ---\n" + await pagB.evaluate(() => JSON.stringify(window.__clicks))); } catch (_) {}
+    console.log("--- rete B ---\n" + reteB.join("\n"));
     process.exitCode = 1;
   } finally {
     await bA.close().catch(() => {});

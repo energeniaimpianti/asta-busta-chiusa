@@ -17,22 +17,30 @@ const CHROME = "C:/Program Files/Google/Chrome/Application/chrome.exe";
 const PERCORSO = path.join(__dirname, "qr_probe.png");
 
 (async () => {
+  // BASE+PIN forniti: si usa un server GIÀ attivo (es. il tunnel della prova);
+  // altrimenti si crea un server scratch su 8090
+  const BASE_ESTERNO = process.env.BASE;
   const { creaServer } = require(path.join(__dirname, "..", "AstaWeb", "server", "asta-server.js"));
   const fs = require("fs"); const os = require("os");
-  const dirTmp = fs.mkdtempSync(path.join(os.tmpdir(), "qrprobe-"));
-  const server = creaServer({ dirDati: dirTmp, pin: "2108" });
-  await new Promise((ok) => server.listen(8090, "0.0.0.0", ok)); // come la serata vera: porta 8090 su tutte le interfacce
-  const porta = server.address().port;
-  const pin = server.sessione.pin;
-  const esito = { porta, pin };
+  let server = null, porta, pin = process.env.PIN;
+  if (BASE_ESTERNO) {
+    porta = new URL(BASE_ESTERNO).port || 80;
+  } else {
+    const dirTmp = fs.mkdtempSync(path.join(os.tmpdir(), "qrprobe-"));
+    server = creaServer({ dirDati: dirTmp, pin: "2108" });
+    await new Promise((ok) => server.listen(8090, "0.0.0.0", ok)); // come la serata vera: porta 8090 su tutte le interfacce
+    porta = server.address().port;
+    pin = server.sessione.pin;
+  }
+  const esito = { base: BASE_ESTERNO || ("http://127.0.0.1:" + porta) };
   try {
     const browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ["--no-first-run", "--disable-gpu"] });
     const pag = await browser.newPage();
-    await pag.goto(`http://127.0.0.1:${porta}/banditore`, { waitUntil: "domcontentloaded" });
+    await pag.goto((BASE_ESTERNO || `http://127.0.0.1:${porta}`) + "/banditore", { waitUntil: "domcontentloaded" });
     await pag.waitForSelector("#pin");
     await pag.type("#pin", pin);
     await pag.click("#vai");
-    await pag.waitForSelector("#qr svg", { timeout: 8000 });
+    await pag.waitForSelector("#qr svg", { timeout: 12000 });
     const indirizzoMostrato = await pag.$eval(".indirizzo", (el) => el.textContent.trim());
     const elQr = await pag.$("#qr");
     // screenshot INGRANDITO del solo QR (deviceScaleFactor 3): più nitido per i decoder
@@ -64,11 +72,13 @@ print((d1 or 'NESSUNO') + '|' + (d2 or 'NESSUNO'))
     try { const r = await fetch(url + "/api/indirizzi"); esito.raggiungibile = r.status === 200; }
     catch (e) { esito.raggiungibile = false; esito.errRaggiungimento = String(e).slice(0, 120); }
 
-    esito.OK = decodificato === indirizzoMostrato && esito.raggiungibile && esito.qrZbar === indirizzoMostrato && decodificato.includes(":8090");
+    esito.OK = decodificato === indirizzoMostrato && esito.raggiungibile && esito.qrZbar === indirizzoMostrato
+      && (BASE_ESTERNO ? decodificato.startsWith("https://") : decodificato.includes(":8090"));
   } finally {
-    if (server.closeAllConnections) server.closeAllConnections();
-    await new Promise((ok) => server.close(ok));
-    fs.rmSync(dirTmp, { recursive: true, force: true });
+    if (server) {
+      if (server.closeAllConnections) server.closeAllConnections();
+      await new Promise((ok) => server.close(ok));
+    }
   }
   console.log(JSON.stringify(esito, null, 2));
   process.exit(esito.OK ? 0 : 1);
