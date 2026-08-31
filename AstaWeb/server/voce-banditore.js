@@ -1,86 +1,93 @@
 /**
- * MOTORE BANDITORE v3 — annunci nati in italiano e barese, non tradotti.
- * Ogni frase è pensata come la direbbe un barese che gioca al fantacalcio.
+ * MOTORE BANDITORE v4 — annunci SOLO in italiano standard.
+ * Ogni frase è scritta per essere pronunciata bene dal sintetizzatore vocale
+ * (niente dialetto, niente troncamenti oscuri) e per il CONTESTO esatto in cui
+ * il motore la usa: il contratto di ogni pool è dichiarato nel commento sopra
+ * la lista. Le categorie di commento sono mutualmente esclusive e coerenti
+ * col prezzo: mai dire "affare" per un prezzo alto, mai "ha svuotato il
+ * portafoglio" per uno economico.
  */
 "use strict";
 
 // ============================================================ POOL
 
+// Apertura del lotto: annuncia SOLO che il giocatore va all'asta.
+// Nessun riferimento a offerte o prezzi (non sono ancora stati letti).
+// {g} = giocatore.
 const APERTURE = [
-  // Italiano
   "Asta chiusa per {g}!",
   "{g}! Si va!",
   "Busta aperta per {g}!",
   "Ci siamo: {g}!",
   "Si è chiusa per {g}.",
-  // Barese
-  "Ué! Andiamo con {g}!",
-  "Ce iè {g} all'asta!",
-  "U mète! {g}!",
-  "Mò n'ascë {g}!",
-  "Acquà {g}! Ce sce dì?",
+  "Sul bancone: {g}!",
+  "Tocca a {g}!",
+  "Signori, in asta c'è {g}!",
+  "Nuovo nome sul bancone: {g}!",
+  "Si parte con {g}!",
 ];
 
+// Lettura di UNA offerta, nel round principale o nello spareggio.
+// Valide come prima o come ennesima lettura: vietate le formule da "rilancio"
+// (la prima offerta letta non è un rilancio di nessuno).
+// {n} = partecipante, {p} = importo.
 const LETTURE = [
-  // Italiano
   "{n} ha offerto {p}.",
   "{n} punta {p}.",
   "{n} ha messo {p} sul piatto.",
   "{n}: {p}.",
   "Da {n}: {p} fantamilioni.",
   "{n} non scherza: {p}!",
-  // Barese
-  "Sul biglietto dë {n}: {p}. Citte citte!",
-  "{n} prupònë {p}!",
-  "{n} l'à scrittë {p}, e nun cangia mente!",
-  "Biglietto dë {n}: {p}. Che dì?!",
-  "{n}: {p}. Mbè!",
-  "Da {n} arrivene {p}! Pròbbie {p}!",
+  "Busta di {n}: {p}.",
+  "{n} entra in gioco: {p}!",
+  "Offerta di {n}: {p} fantamilioni.",
+  "{n} ci crede: {p}!",
+  "Firma di {n}: {p}.",
+  "{n} dice la sua: {p}!",
 ];
 
+// Pausa prima del verdetto: SOLO round costosi (≥25 FMM) o risicati.
+// Brevi, senza nomi e senza prezzi (arrivano nell'aggiudicazione).
 const SUSPENSE = [
-  // Italiano
   "Attenzione...",
   "Ultimo colpo...",
   "Il martello sta per calare...",
   "Ecco il verdetto...",
-  // Barese
-  "Ué, atencióne...",
-  "Mò se decide...",
-  "Che sce donne...",
-  "Aspettë 'nu momendë...",
+  "Respirate, signori...",
+  "Silenzio in sala...",
+  "Si decide adesso...",
+  "Un attimo, ci siamo...",
 ];
 
+// Verdetto completo: deve sempre dire giocatore, vincitore e prezzo.
+// {g}, {n}, {p}.
 const AGGIUDICAZIONI = [
-  // Italiano
   "{g} è aggiudicato a {n} per {p} fantamilioni!",
   "{g} va a {n} per {p}!",
   "{n} si porta a casa {g} per {p}!",
   "Venduto! {n} prende {g} a {p}!",
   "{g} è di {n}! {p} fantamilioni!",
   "Cade l'ascia su {g}: {n} per {p}!",
-  // Barese
-  "{n} l'à vvinète! {g} pe' {p}!",
-  "Sò dì {n}! {g} a {p} fantamilioni!",
-  "{g}? Rrobba dë {n}! Pe' {p}!",
-  "'N'cùlle {n}! {g} a {p}!",
-  "A fallë {n}! {g} pe' {p}!",
-  "{n} l'à pigliate! {g}, {p} fantamilioni!",
+  "Aggiudicato! {g} a {n} per {p}!",
+  "{n} si aggiudica {g} per {p}!",
+  "Martello battuto: {g} va a {n} per {p}!",
+  "Nessuno rilancia: {g} è di {n} per {p}!",
+  "Venduto a {n}! {g} per {p} fantamilioni!",
+  "{n}, {g} è tuo! {p} fantamilioni e via!",
 ];
 
+// Verdetto con il commento integrato nella frase: sempre {g}, {n}, {p}.
 const AGGIUDICAZIONI_INTEGRATE = [
-  // Italiano
   "E {n} con {p} fantamilioni se lo prende!",
   "{n}: {p} e {g} è suo!",
   "E {n} chiude a {p}! Aggiudicato!",
-  // Barese
-  "{n}: {p}! E {g} è rrobba sò!",
-  "E {n} cù {p} së 'u pporta a case!",
+  "{n} non aspetta oltre: {p} e {g} è suo!",
+  "{n} chiude i giochi: {p} e si prende {g}!",
 ];
 
-// ---- PREMI ALTI (≥25 FMM) ----
+// ---- PREMI ALTI (≥25 FMM, margine largo): SOLO stupore per la spesa.
+// Vietato ogni concetto da affare ("rubato", "regalato"): qui ha pagato CARO. ----
 const COMMENTI_ALTI = [
-  // Italiano — cultura fantacalcio vera
   "Ma {p} per {g}?! Quand'è che segna, a Natale?",
   "L'ha pagato oro e vale rame!",
   "Se si infortuna, {n} si ritira dal fantacalcio!",
@@ -91,40 +98,38 @@ const COMMENTI_ALTI = [
   "Con quello che l'ha pagato, gli dovevano dare anche la panchina!",
   "Ma quanto l'ha dato?! Ma quand'è che inizia a pagare gli alimenti?!",
   "Questo è il colpo della giornata! O la cazzata della giornata!",
-  // Barese — autentico
-  "Uè! {p} pe' {g}?! Ma che dì?! Mbè, {n} à spcciàtë tuttë!",
-  "L'à paiète orë e prë! Ma chiddë scioca o fa 'u mudellë?!",
-  "Mazzë e miezë! Cù chiddë solde cë paghe 'u mutuë dë la case!",
-  "Che skande! Ma 'u ssà {n} che stë sparanne pe' 'nu guniërië?!",
-  "Iè assà u dann! {n} m'à rrùnnë tuttë 'u budget!",
-  "'U mariellë dë {n} sta chiangenne! Chiangenne pròbbie!",
-  "Cù {p} fantamilioni cë accattë 'nu motorinë nuève!",
-  "Ma sì du iune, {n}! Pe' chiddë solde m'à vvenùte 'a case!",
-  "Mbè! Ma chiddë scioca a fùtbol o a bballë?!",
-  "Che bbellë colpë! Ma 'u ssà che {g} nun scioca manco a carte?!",
+  "{p} fantamilioni! Ma li ha contati due volte?",
+  "A questo prezzo doveva almeno garantire i gol!",
+  "Il portafoglio di {n} chiede pietà!",
+  "Spendi spendi, {n}: i fantamilioni non fanno i gol!",
+  "Prezzo da fuoriclasse! Speriamo che {g} abbia letto il listino.",
+  "Con quella cifra {n} comprava mezza squadra! E ha preso {g}!",
+  "Fate largo a {g}: lo hanno pagato come un campione, adesso deve giocare come un campione!",
+  "Bottoni! {n} da qui in poi gioca coi bottoni!",
+  "Ma sono fantamilioni o euro veri?! {n} sta sudando!",
+  "Il ragioniere di {n} è già svenuto!",
 ];
 
-// ---- PREMI ECONOMICI (<10 FMM) ----
+// ---- PREMI ECONOMICI (<10 FMM, margine largo): SOLO tema affare.
+// Vietato ogni concetto da spesa folle: qui ha pagato POCO. ----
 const COMMENTI_ECONOMICI = [
-  // Italiano
   "L'ha rubato! Manco al mercato delle pulci!",
   "Con quella cifra manco il parcheggio!",
   "Prezzo da saldo di fine stagione!",
   "Ma è un affare o una truffa?",
   "L'ha pagato quanto un panino! Ma almeno il panino lo mangi!",
   "Praticamente regalato!",
-  // Barese
-  "Pe' 'nu pizzë e panë! Ma 'u règale nisciune?!",
-  "'Na miserie! Cù chiddë solde manco 'u côffë à ll'autogrillë!",
-  "L'à accattete pe' nudde! Pròbbie pe' nudde!",
-  "Cù chiddë solde cë fa 'nu panzerottë a Bare Vècchie!",
-  "Mbè, pe' chiddë prëzë... {n} à fattë 'nu bbellë affarë!",
-  "Pe' {p}?! Manco 'u bigliettë dë ll'autobusë!",
+  "Scontrino della spesa: {p} fantamilioni! Confezione regalo inclusa!",
+  "Via quasi gratis: si paga più la busta che il giocatore!",
+  "Occasione dell'anno! {n} approfitta e ringrazia!",
+  "Altri due così e {n} completa la squadra!",
+  "Ma il prezzo è in fantamilioni o nei punti del supermercato?!",
+  "Bilancio in ordine: {n} compra forte e spende poco!",
 ];
 
-// ---- VITTORIE RISICATE (1-3 FMM) ----
+// ---- VITTORIE RISICATE (margine 1-3 FMM sul round decisivo): SOLO vittoria
+// di misura. Nessun giudizio sul prezzo (il margine, non il valore, è la notizia). ----
 const COMMENTI_RISICATI = [
-  // Italiano
   "Per il rotto della cuffia! Roba da replay!",
   "Un fantamilione di scarto! Manco una gara di kart!",
   "Si è aggiudicato all'ultimo respiro!",
@@ -132,20 +137,20 @@ const COMMENTI_RISICATI = [
   "Vinto per un soffio! L'altro c'è arrivato a un passo!",
   "Che botta! Più battaglia qui che al Survivor!",
   "Si vince per un pelo e si festeggia come un mondiale!",
-  // Barese
-  "Pe' 'nu spiccie! Che iòse, mè! Che iòse!",
-  "'N'dà cù 'nu ffantamilionë! Ma è pròbbie 'nu aggigghie!",
-  "Che fotofinish! Mò me sté 'u corë!",
-  "L'à vvinète all'ulteme momende! Pròbbie all'ulteme!",
-  "Uè! Manco 'u tembe de ddì «rilancio»! Pe' 'nu sordë!",
-  "Che skande pe' 'nu sordë! Ma addà passà 'a nottë!",
-  "Mbè! Pe' 'nu ffantamilionë! Ce tip dë gomm!",
-  "Cchiù strètte dë chë nun se pò! Assà strètte!",
+  "Vittoria ai punti! Il giudice ha alzato la mano!",
+  "Gol di testa sul corner all'ultimo minuto!",
+  "Foto finish! Chi l'avrebbe detto che servisse anche qui!",
+  "Vittoria di misura, come una tappa vinta sullo strappo!",
+  "Margine minimo, emozione massima!",
+  "La differenza l'ha fatta l'ultimo rilancio!",
+  "Sul filo di lana! Ci voleva il rallentatore!",
+  "Un soffio, un battito di ciglia: la sfida era questa!",
 ];
 
-// ---- GENERALI ----
+// ---- GENERALI (fascia media 10-24 FMM, margine largo): NEUTRI sul prezzo.
+// Vietate parole dei pool ALTI ed ECONOMICI ("affare", "regalato", "portafoglio"):
+// per questi prezzi nessuna delle due cose è vera. ----
 const COMMENTI_GENERALI = [
-  // Italiano — autentico fantacalcio
   "Ma quest'anno esplode! L'ho sempre detto!",
   "Il Fantasanta lo odia già!",
   "Ma quando scende in campo 'sto qui? A febbraio?",
@@ -161,39 +166,38 @@ const COMMENTI_GENERALI = [
   "Altro che scudetto! Qui serve Fantaterapia!",
   "L'ha preso che manco sapeva chi fosse!",
   "Speriamo non si infortuna il primo giorno!",
-  // Barese — autentico
-  "Che bbellë piglià! 'N'cùlle {n}!",
-  "{n} è cchiù furbë d'na volpë! Sajë sciucà!",
-  "Ce tip dë gomm! Ma {g} chi è, 'u nipotë dë Sandro Pertini?!",
-  "{n} sta façenne 'na squadrë che fa paurë! Paurë bruttë!",
-  "Mbè! Chiddë nun scioca manco all'allenamentë!",
-  "'U tacì vale na dòppia respòste! {n} s'à ttacìute bbone!",
-  "Passàte u sànde, passàte la féste! E mo' {g} è rrobba dë {n}!",
-  "Sì nu bbellë prisce, {n}! Nu bbellë prisce pròbbie!",
-  "Chiddë è cchiù rarë d'nu' fravaglie d'ore!",
-  "L'à pigliate bbone! Ma mò addà sciocà bbone pure!",
-  "La speriénze dë {n}! Cchiù dë la ssciénze!",
-  "Acquà! {n} àutta apprime e àutta do volde!",
-  "Che rrobbe! Ma indò l'è sciòccë {n}?!",
-  "Mò se vvede! Mò se vvede chi scioca bbone!",
-  "{n} à 'nu bellë sciuppë! Nu bellë sciuppë fattë!",
-  "Mbè! {n} sajë cchiù dë nui!",
+  "{n} sta costruendo la squadra dei sogni! Sogni di chi, non si sa!",
+  "Colpo di mercato! Almeno sulla carta.",
+  "Nel mio listino {g} valeva meno! Ma il mio listino non lo legge nessuno.",
+  "Mister {n} e la sua lavagna: questa scelta se la segna!",
+  "L'acquisto della ragione! O della disperazione, dipende dai punti di vista.",
+  "Un nome, una garanzia! La garanzia è scaduta, ma sempre garanzia!",
+  "In sala chi esulta e chi si dispera: questo è il fantacalcio!",
+  "{n} procede per intuizione! E si vede!",
+  "Panchina o titolare? Il mister {n} deciderà a stagione inoltrata!",
+  "Il Fantasanta annota tutto: si ricorda anche dei regali!",
+  "Firma, timbro e maglia nuova per {g}!",
+  "Al bar li aspettano già: per festeggiare o per processarli!",
+  "Quest'asta è una guerra di nervi, e {n} non trema!",
+  "Battute di mano per {g}: benvenuto in squadra!",
+  "Pochi lo conoscevano, ma {n} ha fatto i compiti a casa!",
+  "Un acquisto che farà discutere! Bene: il fantacalcio vive di discussioni!",
 ];
 
-// ---- NON VENDUTO ----
+// ---- NON VENDUTO: usate SOLO a zero offerte (nessuno ha voluto davvero il
+// giocatore). Mai per reparti pieni o salto del banditore: lì il motivo è
+// un altro e la presa in giro sarebbe falsa. ----
 const COMMENTI_NON_VENDUTO = [
-  // Italiano
   "Nessuno lo vuole!",
   "Resta sul bancone!",
   "Tutti a casa!",
   "Neanche a pagalo!",
   "Svincolato! Manco la fantamadre lo voleva!",
-  // Barese
-  "Nisciune 'u vò!",
-  "Resti llà, citte citte!",
-  "Ma che dì?! Nisciune?! Ma sì du iune!",
-  "'U prise! Nisciune 'u vò!",
-  "Nisciune?! Ma mò me sccande!",
+  "Nessuno ha staccato un fantamilione!",
+  "Silenzio assenso? No, silenzio e basta!",
+  "Passato alla storia: passato e basta!",
+  "Neanche un'offerta di cortesia!",
+  "Il bancone è la sua nuova casa!",
 ];
 
 // ============================================================ UTILITÀ
@@ -239,6 +243,8 @@ function generaAnnuncio(r, rng) {
   return generaAggiudicazione(r, rng);
 }
 
+// sorteggio: i due finalisti hanno offerto LO STESSO importo, ha deciso la
+// sorte — le frasi finali parlano solo di sorte, mai di rilancio vincente
 function generaSorteggio(r, rng) {
   const rnd = rng || Math.random;
   const g = r.giocatore.nome;
@@ -255,9 +261,9 @@ function generaSorteggio(r, rng) {
     "la monetina ha deciso: è di {n} per {p}!",
     "il destino ha scelto {n}! {p} fantamilioni!",
     "la fortuna bacia {n}! {p}!",
-    "estrazione: {n}! Pe' {p}!",
-    "mò se sorteja: {n}! {p}!",
-    "Uè! 'A sorte sce fa {n}! Pe' {p}!",
+    "la monetina parla: {n}! Per {p}!",
+    "ha deciso la sorte, non il portafoglio: {n} per {p}!",
+    "testa o croce? È uscito {n}! {p} fantamilioni!",
   ], "so", rnd), { nome: r.vincitore, prezzo: r.importoFinale });
   return t;
 }

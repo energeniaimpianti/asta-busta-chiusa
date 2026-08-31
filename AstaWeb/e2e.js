@@ -12,6 +12,7 @@
 
 const puppeteer = require("puppeteer-core");
 const { unzip } = require("./server/asta-server.js");
+const { POOL: VOCE } = require("./server/voce-banditore.js");
 
 const CHROME = "C:/Program Files/Google/Chrome/Application/chrome.exe";
 // BASE sovrascrivibile: con BASE=https://...trycloudflare.com il collaudo passa
@@ -270,7 +271,7 @@ const ok = (msg) => { CHECK++; console.log("OK " + msg); };
     assert(tA2.includes("saltato dal banditore"), "motivo «saltato dal banditore» mostrato");
     const annSal = tA2.slice(tA2.indexOf("Annuncio:"));
     assert(annSal.includes("Il banditore salta"), "l'annuncio annuncia il salto: " + annSal.slice(0, 200));
-    assert(!annSal.includes("Nisciune") && !annSal.includes("Nessuno lo vuole"), "niente prese in giro quando salta il banditore");
+    assert(!VOCE.COMMENTI_NON_VENDUTO.some((f) => annSal.includes(f)), "niente prese in giro quando salta il banditore");
     ok("salta: non venduto col motivo vero, annuncio senza falsi «nessuno lo vuole»");
 
     // ------------------------------------------------ termine + Excel multi-foglio
