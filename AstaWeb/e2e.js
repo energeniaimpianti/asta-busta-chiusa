@@ -58,10 +58,10 @@ const ok = (msg) => { CHECK++; console.log("OK " + msg); };
 
   const testo = (p) => p.evaluate(() => document.body.innerText);
 
-  const csvDemo = "Nome;Ruolo;Quotazione\n" +
-    ["Lautaro Martinez;A;45", "Retegui;A;42", "Kean;A;38", "Vlahovic;A;39", "Pulisic;A;37",
-     "Sommer;P;20", "Meret;P;15", "Bastoni;D;28", "Dimarco;D;25",
-     "Barella;C;30", "Tonali;C;27", "Mkhitaryan;C;18"].join("\n") + "\n";
+  const csvDemo = "Nome;Ruolo;Quotazione;Squadra\n" +
+    ["Lautaro Martinez;A;45;Inter", "Retegui;A;42;Atalanta", "Kean;A;38;Fiorentina", "Vlahovic;A;39;Juventus", "Pulisic;A;37;Milan",
+     "Sommer;P;20;Inter", "Meret;P;15;Napoli", "Bastoni;D;28;Inter", "Dimarco;D;25;Inter",
+     "Barella;C;30;Inter", "Tonali;C;27;Milan", "Mkhitaryan;C;18;Inter"].join("\n") + "\n";
 
   try {
     // sessione pulita + preparazione via API (l'UI di tutto il resto è collaudata sotto)
@@ -116,22 +116,26 @@ const ok = (msg) => { CHECK++; console.log("OK " + msg); };
     await pagA.click("#avvia");
     await pagA.waitForFunction(() => document.body.innerText.includes("Lautaro Martinez"), { timeout: 8000 });
     tA = await testo(pagA);
-    assert(tA.includes("quotazione base (solo tu la vedi)"), "quotazione base visibile al solo banditore");
+    assert(tA.includes("Quotazione minima"), "quotazione minima visibile al banditore sotto il nome");
     assert(dialoghi.some((d) => d.tipo === "confirm" && d.msg.includes("Avviare")), "conferma nativa avvio gestita");
     ok("avvio asta: dialog nativo accettato");
-    // bottoni touch: in viewport telefono le azioni devono essere grandi (>=48px)
+    // bottoni touch: in viewport telefono le azioni devono essere grandi (>=48px);
+    // TERMINA è ripiegato nei comandi rari: in prima fila NON ci deve essere
     const altezze = await pagA.$$eval('.riga-azioni .btn', (bs) => bs.map((b) => b.getBoundingClientRect().height));
-    assert(altezze.length >= 3 && altezze.every((h) => h >= 48), "bottoni azione touch >= 48px: " + JSON.stringify(altezze));
+    assert(altezze.length >= 2 && altezze.every((h) => h >= 48), "bottoni azione touch >= 48px: " + JSON.stringify(altezze));
+    assert(!(await pagA.$('.riga-azioni [data-azione="termina"]')), "termina NON in prima fila");
+    assert(!!(await pagA.$('.comandi-rari [data-azione="termina"]')), "termina presente nei comandi rari");
     const colonne = await pagA.$eval(".griglia-p", (g) => getComputedStyle(g).gridTemplateColumns.split(" ").length);
     assert(colonne === 1, "griglia partecipanti su una colonna nel telefono");
     ok("vista mobile: 3+ bottoni da " + Math.round(Math.min(...altezze)) + "px, partecipanti in colonna");
 
-    // ------------------------------------------------ partecipante: vede SOLO il nome
+    // ------------------------------------------------ partecipante: nome + squadra + quotazione minima
     await pagB.waitForFunction(() => document.body.innerText.includes("Lautaro Martinez"), { timeout: 8000 });
     const tB = await testo(pagB);
-    assert(!tB.toLowerCase().includes("quotazione"), "nessuna quotazione sul telefono partecipante");
+    assert(tB.includes("Quotazione minima"), "quotazione minima visibile anche al partecipante (sotto il nome)");
+    assert(tB.includes("Inter"), "squadra di appartenenza visibile sotto il nome");
     assert(tB.includes("Attaccante"), "ruolo visibile al partecipante");
-    ok("partecipante: nome e ruolo, NESSUNA quotazione");
+    ok("partecipante: nome, squadra, ruolo e quotazione minima");
     await pagB.screenshot({ path: "../.tools/e2e_partecipante_asta.png" });
 
     // busta di Giovanni: 44 (il click-logger diagnostico resta: se un giorno il
@@ -240,29 +244,35 @@ const ok = (msg) => { CHECK++; console.log("OK " + msg); };
     await pagA.waitForFunction(() => document.body.innerText.includes("Spareggio al pari di 20"), { timeout: 8000 });
     ok("pareggio 20-20: spareggio aperto");
     await pagB.waitForFunction(() => document.body.innerText.includes("Spareggio"), { timeout: 8000 });
+    await pagB.waitForFunction(() => document.body.innerText.includes("puoi"), { timeout: 8000 });
+    // nello spareggio il tasto 0 è DISABILITATO (non ci si ritira): offerte senza zeri
+    const zeroDisabilitato = await pagB.$eval('.pad button[data-t="0"]', (b) => b.disabled);
+    assert(zeroDisabilitato, "tasto 0 disabilitato nello spareggio");
+    assert(!(await pagB.$("#passo")), "bottone Passo assente nello spareggio");
     await pagB.click('.pad button[data-t="3"]');
-    await pagB.click('.pad button[data-t="0"]');
+    await pagB.click('.pad button[data-t="2"]');
     await pagB.click("#consegna");
     await pagB.waitForFunction(() => document.body.innerText.includes("Busta consegnata"), { timeout: 8000 });
     await api("/api/offerta", JSON.stringify({ pid: cred.Bruno.pid, token: cred.Bruno.token, importo: 22 }));
     await pagA.waitForFunction(() => document.body.innerText.includes("🏆"), { timeout: 20000 });
     tA2 = (await testo(pagA)).replace(/\s+/g, " ");
-    assert(tA2.includes("→ Giovanni per 30 FMM") && tA2.includes("Vlahovic"), "Vlahovic aggiudicato a Giovanni per 30");
+    assert(tA2.includes("→ Giovanni per 32 FMM") && tA2.includes("Vlahovic"), "Vlahovic aggiudicato a Giovanni per 32");
     const annSp = tA2.slice(tA2.indexOf("Annuncio:"));
     assert(annSp.includes("Pareggio! Si va allo spareggio."), "lo spareggio è raccontato nell'annuncio: " + annSp.slice(0, 250));
-    assert(annSp.includes("22") && annSp.includes("30"), "le offerte di spareggio sono lette");
-    ok("spareggio 20-20 → 30-22: aggiudicato e ANNUNCIATO con il racconto dello spareggio");
+    assert(annSp.includes("22") && annSp.includes("32"), "le offerte di spareggio sono lette");
+    assert(!/\b20\b/.test(annSp), "l'asta iniziale (20-20) NON va ripetuta: solo l'ultimo rilancio");
+    ok("spareggio 20-20 → 32-22: aggiudicato, voce con SOLO l'ultimo rilancio");
     await pagA.screenshot({ path: "../.tools/e2e_banditore_spareggio.png" });
 
     // ------------------------------------------------ annulla ultima aggiudicazione
-    // budget di Giovanni letto dall'header del suo telefono: 500 - 44 (Lautaro) - 30 (Kean) - 30 (Vlahovic) = 396
-    await pagB.waitForFunction(() => document.body.innerText.includes("396 FMM"), { timeout: 8000 });
+    // budget di Giovanni letto dall'header del suo telefono: 500 - 44 (Lautaro) - 30 (Kean) - 32 (Vlahovic) = 394
+    await pagB.waitForFunction(() => document.body.innerText.includes("394 FMM"), { timeout: 8000 });
     await pagA.click('[data-azione="annulla"]');
     await pagA.waitForFunction(() => document.body.innerText.includes("Vlahovic") && !document.body.innerText.includes("Annuncio:"), { timeout: 8000 });
-    // annullato Vlahovic (30): il budget torna 426 e la fase riapre le buste
+    // annullato Vlahovic (32): il budget torna 426 e la fase riapre le buste
     await pagB.waitForFunction(() => document.body.innerText.includes("426 FMM"), { timeout: 8000 });
     assert((await testo(pagB)).includes("Vlahovic"), "Vlahovic di nuovo all'asta sul telefono");
-    ok("annullamento: Vlahovic torna all'asta, budget ripristinato 396→426");
+    ok("annullamento: Vlahovic torna all'asta, budget ripristinato 394→426");
 
     // ------------------------------------------------ salta → non venduto col motivo giusto
     await pagA.click('[data-azione="salta"]');
@@ -277,11 +287,38 @@ const ok = (msg) => { CHECK++; console.log("OK " + msg); };
     // ------------------------------------------------ termine + Excel multi-foglio
     await pagA.click('[data-azione="prossimo"]');
     await pagA.waitForFunction(() => document.body.innerText.includes("Pulisic") || document.body.innerText.includes("Asta conclusa"), { timeout: 8000 });
+    // TERMINA è ripiegato: prima si apre il pannello dei comandi rari, poi si preme
+    await pagA.click(".comandi-rari summary");
     await pagA.click('[data-azione="termina"]');
     await pagA.waitForFunction(() => document.body.innerText.includes("Asta conclusa"), { timeout: 8000 });
     assert((await testo(pagA)).includes("SCARICA EXCEL COMPLETO (5 fogli)"), "link Excel nella schermata fine");
-    ok("serata terminata: schermata fine con link Excel");
+    ok("serata terminata (dai comandi rari): schermata fine con link Excel");
     await pagA.screenshot({ path: "../.tools/e2e_banditore_fine.png" });
+
+    // ------------------------------------------------ regie del banditore a fine asta
+    // crediti di Bruno corretti a 333 + annullamento di Lautaro (era di Giovanni per 44)
+    // (textContent, non innerText: dopo il ridisegno il pannello si richiude e innerText sparirebbe)
+    await pagA.click(".regie summary");
+    const idInpBruno = await pagA.$$eval(".regia-sq", (divs) => {
+      const d = divs.find((x) => x.textContent.includes("Bruno"));
+      return d ? d.querySelector("input").id : null;
+    });
+    assert(idInpBruno, "riga regie di Bruno trovata");
+    await pagA.evaluate((id) => { document.getElementById(id).value = ""; }, idInpBruno);
+    await pagA.type("#" + idInpBruno, "333");
+    await pagA.$$eval(".regia-sq", (divs) => {
+      divs.find((x) => x.textContent.includes("Bruno")).querySelector("[data-setbudget]").click();
+    });
+    await pagA.waitForFunction(() => document.body.innerText.includes("333"), { timeout: 8000 });
+    await pagA.$$eval(".regia-sq", (divs) => {
+      const d = divs.find((x) => x.textContent.includes("Giovanni"));
+      [...d.querySelectorAll(".regia-riga")].find((r) => r.textContent.includes("Lautaro Martinez")).querySelector("[data-annulla-g]").click();
+    });
+    // effetto durevole (il toast è effimero): Giovanni rimborsato di 44 → 426+44=470 e rosa senza Lautaro
+    await pagB.waitForFunction(() => document.body.innerText.includes("470 FMM"), { timeout: 8000 });
+    const tRosab = await testo(pagB);
+    assert(tRosab.includes("Kean") && !tRosab.includes("Lautaro Martinez"), "rosa di Giovanni senza Lautaro, con Kean");
+    ok("regie: crediti Bruno → 333, Lautaro annullato (Giovanni rimborsato → 470)");
 
     const rX = await fetch(BASE + "/api/esporta.xlsx?pin=" + PIN);
     assert(rX.status === 200, "download xlsx");
@@ -293,7 +330,10 @@ const ok = (msg) => { CHECK++; console.log("OK " + msg); };
       assert(wb.includes(nome), "foglio mancante nell'Excel: " + nome);
     }
     for (let i = 1; i <= 5; i++) assert(voci["xl/worksheets/sheet" + i + ".xml"], "sheet" + i + " mancante");
-    ok("Excel multi-foglio: 5 fogli con i nomi giusti (" + Math.round(buf.length / 1024) + " KB)");
+    // le regie si vedono nell'Excel: Lautaro ANNULLATO nel foglio Asta completa, 333 nel Riepilogo
+    assert(voci["xl/worksheets/sheet3.xml"].toString("utf8").includes("ANNULLATO"), "annullamento tracciato nel foglio Asta completa");
+    assert(voci["xl/worksheets/sheet2.xml"].toString("utf8").includes("333"), "crediti corretti (333) nel foglio Riepilogo");
+    ok("Excel multi-foglio: 5 fogli, ANNULLATO e crediti 333 tracciati (" + Math.round(buf.length / 1024) + " KB)");
 
     console.log("\n=== E2E COMPLETO SUPERATO — " + CHECK + " checkpoint ===");
   } catch (e) {

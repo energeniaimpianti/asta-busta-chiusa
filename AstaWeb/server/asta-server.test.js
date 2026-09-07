@@ -116,10 +116,9 @@ test("pareggio apre spareggio: no ritiro, min=propria offerta", () => {
   for (let i = 6; i <= 8; i++) m.offri(i, 0);
   assert.strictEqual(m.stato.fase, "SPAREGGIO");
   assert.deepStrictEqual(m.stato.candidatiSpareggio.sort(), [2, 5]);
-  assert.strictEqual(m.stato.pareggioOriginale, 20);
   assert.strictEqual(m.offri(2, 0).ok, false);           // no ritiro
   assert.strictEqual(m.offri(2, 19).ok, false);          // sotto la propria offerta
-  assert.strictEqual(m.offri(2, 20).ok, true);           // uguale alla propria: ok
+  assert.strictEqual(m.offri(2, 20).ok, true);           // RIPETE la propria: consentito (regola 07/09)
   assert.strictEqual(m.offri(5, 25).ok, true);
   const r = m.stato.rivelazione;
   assert.strictEqual(r.vincitore, "P5");
@@ -127,7 +126,7 @@ test("pareggio apre spareggio: no ritiro, min=propria offerta", () => {
   assert.strictEqual(m.stato.squadre[5].budgetResiduo, 475);
 });
 
-test("spareggio stesso importo dell'originale: SORTEGGIO (monetina)", () => {
+test("spareggio UNICO: ogni pareggio (stessa puntata o salita uguale) decide la MONETINA", () => {
   const m = new MotoreAsta();
   m.avvia(cfgStd(), parts8(), listaStd());
   m.offri(1, 20); m.offri(2, 20);
@@ -146,33 +145,81 @@ test("spareggio stesso importo dell'originale: SORTEGGIO (monetina)", () => {
   assert.ok(t.includes("sorteggiato"), "annuncio deve dire sorteggiato");
 });
 
-test("spareggio a importo superiore apre il SECONDO spareggio (ultimo)", () => {
+test("spareggio pareggiato SALENDO uguale (25-25 dopo 20-20): monetina subito, niente secondo spareggio", () => {
   const m = new MotoreAsta();
   m.avvia(cfgStd(), parts8(), listaStd());
   m.offri(1, 20); m.offri(2, 20);
   for (let i = 3; i <= 8; i++) m.offri(i, 0);
   m.offri(1, 25); m.offri(2, 25);
-  assert.strictEqual(m.stato.fase, "SPAREGGIO");
-  assert.strictEqual(m.stato.spareggi, 2);
-  m.offri(1, 30); m.offri(2, 28);
-  const r = m.stato.rivelazione;
-  assert.strictEqual(r.vincitore, "P1");
-  assert.strictEqual(r.importoFinale, 30);
-  assert.strictEqual(r.sorteggiato, false);
-});
-
-test("spareggio 2 finito in parita: SORTEGGIO", () => {
-  const m = new MotoreAsta();
-  m.avvia(cfgStd(), parts8(), listaStd());
-  m.offri(1, 20); m.offri(2, 20);
-  for (let i = 3; i <= 8; i++) m.offri(i, 0);
-  m.offri(1, 25); m.offri(2, 25);
-  assert.strictEqual(m.stato.spareggi, 2);
-  m.offri(1, 28); m.offri(2, 28);
+  assert.strictEqual(m.stato.fase, "RIVELAZIONE", "pareggio nello spareggio deve sorteggiare subito");
+  assert.strictEqual(m.stato.spareggi, 1, "esiste UNO solo spareggio");
   const r = m.stato.rivelazione;
   assert.strictEqual(r.sorteggiato, true);
-  assert.strictEqual(r.importoFinale, 28);
+  assert.strictEqual(r.importoFinale, 25);
   assert.ok(r.vincitore === "P1" || r.vincitore === "P2");
+});
+
+test("annullaAssegnazione: QUALSIASI assegnazione, in qualsiasi momento", () => {
+  const m = new MotoreAsta();
+  m.avvia(cfgStd(), parts8(), listaStd());
+  // round 1: P6 compra il primo attaccante per 40
+  m.offri(6, 40);
+  for (let i = 1; i <= 5; i++) m.offri(i, 0);
+  m.offri(7, 0); m.offri(8, 0);
+  assert.strictEqual(m.stato.rivelazione.vincitore, "P6");
+  // avanti di qualche round
+  m.prossimo();
+  m.offri(3, 12);
+  for (const i of [1, 2, 4, 5, 6, 7, 8]) m.offri(i, 0);
+  m.prossimo();
+  // il banditore annulla l'assegnazione del PRIMO round (id 0 = Attaccante Uno, di P6 per 40), ora passata
+  const idPrimo = 0;
+  assert.strictEqual(m.stato.squadre[6].rosa.length, 1);
+  const esito = m.annullaAssegnazione(idPrimo);
+  assert.strictEqual(esito.ok, true);
+  assert.strictEqual(esito.giocatore, "Attaccante Uno");
+  assert.strictEqual(esito.importo, 40);
+  assert.strictEqual(m.stato.squadre[6].budgetResiduo, 500, "rimborsato l'intero acquisto annullato");
+  assert.strictEqual(m.stato.squadre[6].rosa.length, 0);
+  assert.ok(m.stato.coda.includes(idPrimo), "giocatore rimesso in coda");
+  assert.strictEqual(m.stato.fase, "ATTESA_OFFERTE", "il round in corso non si tocca");
+  assert.strictEqual(m.corrente.nome, "Centrocampista Uno", "il corrente resta il round in corso");
+  // annullare un giocatore non assegnato viene rifiutato
+  assert.strictEqual(m.annullaAssegnazione(999).ok, false);
+  assert.strictEqual(m.annullaAssegnazione(idPrimo).ok, false, "già annullato: non più assegnato");
+  // l'evento è nella storia (l'Excel lo rispetta)
+  assert.ok(m.stato.eventi.some((e) => e.tipo === "AnnullamentoAggiudicazione" && e.idGiocatore === idPrimo));
+});
+
+test("annullaAssegnazione del round appena rivelato: rifà il round da capo", () => {
+  const m = new MotoreAsta();
+  m.avvia(cfgStd(), parts8(), listaStd());
+  m.offri(6, 40);
+  for (let i = 1; i <= 5; i++) m.offri(i, 0);
+  m.offri(7, 0); m.offri(8, 0);
+  assert.strictEqual(m.annullaAssegnazione(0).ok, true);
+  assert.strictEqual(m.stato.fase, "ATTESA_OFFERTE");
+  assert.strictEqual(m.corrente.nome, "Attaccante Uno");
+  assert.ok(!m.stato.coda.includes(0), "il corrente non è anche in coda");
+  m.offri(2, 8);
+  for (const i of [1, 3, 4, 5, 6, 7, 8]) m.offri(i, 0);
+  assert.strictEqual(m.stato.rivelazione.vincitore, "P2");
+});
+
+test("impostaBudget: il banditore corregge i crediti in qualsiasi momento", () => {
+  const m = new MotoreAsta();
+  m.avvia(cfgStd(), parts8(), listaStd());
+  m.offri(6, 40);
+  for (const i of [1, 2, 3, 4, 5, 7, 8]) m.offri(i, 0);
+  assert.strictEqual(m.stato.squadre[6].budgetResiduo, 460);
+  assert.strictEqual(m.impostaBudget(6, 600).ok, true);
+  assert.strictEqual(m.stato.squadre[6].budgetResiduo, 600);
+  assert.strictEqual(m.impostaBudget(6, -5).ok, false);
+  assert.strictEqual(m.impostaBudget(6, 12.5).ok, false);
+  assert.strictEqual(m.impostaBudget(99, 500).ok, false);
+  // la regola del resto usa subito i crediti nuovi
+  assert.strictEqual(m.maxOfferta(6), 600 - (m._slotVuoti(6) - 1));
+  assert.ok(m.stato.eventi.some((e) => e.tipo === "BudgetModificato" && e.idPartecipante === 6 && e.a === 600));
 });
 
 test("forza chiusura del banditore: i mancanti fanno passo", () => {
@@ -305,6 +352,24 @@ test("csv con header punto e virgola e ruoli normalizzati", () => {
   assert.strictEqual(e.giocatori[0].quotazioneBase, 45);
 });
 
+test("colonna SQUADRA (07/09): header, posizionale e retrocompatibilità", () => {
+  // con intestazione esplicita
+  const e1 = ParserLista.daCsv("Nome;Ruolo;Quotazione;Squadra\nLautaro Martinez;A;45;Inter\nMeret;P;18;Napoli\n");
+  assert.deepStrictEqual(e1.errori, []);
+  assert.strictEqual(e1.giocatori[0].squadra, "Inter");
+  assert.strictEqual(e1.giocatori[1].squadra, "Napoli");
+  // senza header: la quarta colonna è la squadra
+  const e2 = ParserLista.daCsv("Lautaro Martinez;A;45;Inter\n");
+  assert.strictEqual(e2.giocatori[0].squadra, "Inter");
+  // liste vecchie a 3 colonne: squadra vuota, tutto il resto invariato
+  const e3 = ParserLista.daCsv("Nome;Ruolo;Quotazione\nLautaro Martinez;A;45\n");
+  assert.strictEqual(e3.giocatori[0].squadra, "");
+  assert.strictEqual(e3.giocatori[0].quotazioneBase, 45);
+  // colonna squadra assente dall'header → vuota senza errori
+  const e4 = ParserLista.daCsv("Nome;Ruolo;Quotazione;Altro\nLautaro;A;45;xx\n");
+  assert.strictEqual(e4.giocatori[0].squadra, "");
+});
+
 test("csv con virgolette, separatore interno e BOM", () => {
   const e = ParserLista.daCsv("\uFEFFNome,Ruolo,Quotazione\n\"Rossi, Mario\",Difensore,10\n\"Fabbri \"\"Il Fenomeno\"\"\",C,5\n");
   assert.deepStrictEqual(e.errori, []);
@@ -417,7 +482,7 @@ function astaCasuale(seme) {
     budgetIniziale: 100 + Math.floor(rnd() * 900),
     quote,
     ordineRuoli: ["A", "C", "P", "D"].sort(() => rnd() - 0.5),
-    regolaResto: rnd() > 0.5, baseComeMinimo: rnd() > 0.5, spareggioDaPari: rnd() > 0.5,
+    regolaResto: rnd() > 0.5, baseComeMinimo: rnd() > 0.5,
     ordineCasuale: rnd() > 0.5, seed: seme,
   };
   const totSlot = Object.values(quote).reduce((a, b) => a + b, 0);
@@ -435,14 +500,20 @@ function astaCasuale(seme) {
       else if (rnd() < 1 / 60 && m.stato.fase === "ATTESA_OFFERTE") m.salta();
       else {
         const max = m.maxOfferta(p.id);
-        const dado = Math.floor(rnd() * 10);
-        let offerta;
-        if (dado === 0) offerta = 0;
-        else if (dado === 1) offerta = -5;
-        else if (dado === 2) offerta = max + 5;
-        else if (dado === 3) offerta = 2147483647;
-        else offerta = 1 + Math.floor(rnd() * Math.max(1, max));
-        m.offri(p.id, offerta);
+        if (m.stato.fase === "SPAREGGIO") {
+          // ammissibile sempre: la propria puntata (ripetuta → monetina) o una salita
+          const min = m.stato.offerteRoundPrincipale[p.id] || 1;
+          m.offri(p.id, rnd() < 0.5 ? min : Math.max(min, 1 + Math.floor(rnd() * max)));
+        } else {
+          const dado = Math.floor(rnd() * 10);
+          let offerta;
+          if (dado === 0) offerta = 0;
+          else if (dado === 1) offerta = -5;
+          else if (dado === 2) offerta = max + 5;
+          else if (dado === 3) offerta = 2147483647;
+          else offerta = 1 + Math.floor(rnd() * Math.max(1, max));
+          m.offri(p.id, offerta);
+        }
       }
     } else if (m.stato.fase === "RIVELAZIONE") {
       if (rnd() < 1 / 25) m.annullaUltimaAggiudicazione(); else m.prossimo();
@@ -479,9 +550,18 @@ test("asta deterministica completa tutte le rose da 25 (8 partecipanti)", () => 
   while (m.stato.fase !== "FINE" && guardia++ < 60000) {
     if (m.stato.fase === "ATTESA_OFFERTE" || m.stato.fase === "SPAREGGIO") {
       const ps = m.interrogabili();
-      if (ps.length) m.offri(ps[0].id, 1);
-      ps.slice(1).forEach((p) => m.offri(p.id, 0));
-      // ps[0] punta 1, gli altri 0: unico vincitore, nessuno svincolato
+      if (ps.length) {
+        if (m.stato.fase === "SPAREGGIO") {
+          // nello spareggio 0 è rifiutato e il minimo è la PROPRIA puntata:
+          // il primo candidato sale di 1, gli altri ripetono la propria
+          m.offri(ps[0].id, (m.stato.offerteRoundPrincipale[ps[0].id] || 1) + 1);
+          ps.slice(1).forEach((p) => m.offri(p.id, m.stato.offerteRoundPrincipale[p.id] || 1));
+        } else {
+          m.offri(ps[0].id, 1);
+          ps.slice(1).forEach((p) => m.offri(p.id, 0));
+          // ps[0] punta 1, gli altri 0: unico vincitore, nessuno svincolato
+        }
+      }
     } else m.prossimo();
   }
   assert.strictEqual(m.stato.fase, "FINE");
@@ -507,6 +587,12 @@ test("stress 12 partecipanti x 500 giocatori sotto 20 secondi", () => {
       const interr = m.interrogabili();
       const p = interr[Math.floor(rnd() * interr.length)];
       if (!p) m.forzaChiusura();
+      else if (m.stato.fase === "SPAREGGIO") {
+        // nello spareggio le offerte sotto la propria puntata sono rifiutate:
+        // genera sempre valori ammissibili (ripetizione inclusa → monetina)
+        const min = m.stato.offerteRoundPrincipale[p.id] || 1;
+        m.offri(p.id, rnd() < 0.5 ? min : Math.max(min, 1 + Math.floor(rnd() * m.maxOfferta(p.id))));
+      }
       else m.offri(p.id, rnd() < 1 / 3 ? 0 : 1 + Math.floor(rnd() * (m.maxOfferta(p.id) + 1)));
     } else m.prossimo();
   }
@@ -590,7 +676,8 @@ test("server: flusso completo 8 partecipanti + SEGRETEZZA offerte + persistenza"
     assert.strictEqual(vb.giocatore.nome, "G3");
     const v1 = await primaVistaSse(porta, "pid=1");
     assert.strictEqual(v1.giocatore.nome, "G3");
-    assert.strictEqual(v1.giocatore.quotazioneBase, undefined, "quotazione base NON deve arrivare al partecipante");
+    assert.strictEqual(v1.giocatore.quotazioneBase, 8, "quotazione minima visibile al partecipante (richiesta 07/09)");
+    assert.strictEqual(v1.spareggio, null);
     const xmlVb = JSON.stringify(vb);
     assert.ok(!/"offerte"\s*:/.test(xmlVb) || vb.fase === "RIVELAZIONE", "vista banditore senza importi round");
 

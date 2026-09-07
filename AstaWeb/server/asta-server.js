@@ -39,7 +39,6 @@ const CONFIG_DEFAULT = {
   baseComeMinimo: false,
   ordineCasuale: false,
   seed: 2026,
-  spareggioDaPari: true,
 };
 
 function normalizzaRuolo(testo) {
@@ -105,7 +104,6 @@ class MotoreAsta {
       offerteRoundPrincipale: {},
       ultimoSpareggio: {},
       spareggi: 0,
-    pareggioOriginale: 0,
       squadre,
       nonVenduti: [],
       reinsertioni: {},
@@ -162,8 +160,6 @@ class MotoreAsta {
     return this.stato.config.baseComeMinimo ? Math.max(1, g.quotazioneBase) : 1;
   }
 
-  _minSpareggio(pariA) { return this.stato.config.spareggioDaPari ? pariA + 1 : 1; }
-
   _pariCorrente() {
     const base = this.stato.spareggi > 0 ? this.stato.offerteRoundPrincipale : this.stato.offerte;
     return Math.max(0, ...Object.values(base), 0);
@@ -197,7 +193,6 @@ class MotoreAsta {
     }
     if (s.fase === FASI.SPAREGGIO) {
       if (!s.candidatiSpareggio.includes(pid)) return "FUORI_SPAREGGIO";
-      if (s.offerte[pid] === 0) return "RITIRATO";
       if (pid in s.offerte) return "PUNTATO";
       return "IN_ATTESA";
     }
@@ -212,14 +207,16 @@ class MotoreAsta {
     if (inSpareggio && !s.candidatiSpareggio.includes(pid)) return { ok: false, errore: "Non candidato allo spareggio" };
     if (!inSpareggio && !this.idonei().some((p) => p.id === pid)) return { ok: false, errore: "Partecipante non idoneo per questo reparto" };
     if (pid in s.offerte) return { ok: false, errore: "Offerta già registrata" };
+    // nello spareggio il minimo è la PROPRIA puntata del round principale:
+    // ripeterla è consentito (richiesta esplicita della lega), scendere no
     const min = inSpareggio
-      ? (s.spareggi >= 2 ? (s.ultimoSpareggio[pid] || 1) : (s.offerteRoundPrincipale[pid] || 1))
+      ? (s.offerteRoundPrincipale[pid] || 1)
       : this.minOffertaCorrente();
     const max = this.maxOfferta(pid);
     const n = Number(importo);
     if (!Number.isInteger(n)) return { ok: false, errore: "Importo non valido" };
     if (inSpareggio && n === 0) {
-      return { ok: false, errore: "Nello spareggio non ci si può ritirare: offri almeno " + min };
+      return { ok: false, errore: "Nello spareggio non ci si ritira: ripeti i tuoi " + min + " o punta più alto" };
     }
     if (n !== 0) {
       if (n < min) return { ok: false, errore: `Offerta minima: ${min}` };
@@ -238,10 +235,8 @@ class MotoreAsta {
     if (mancanti.length > 0) {
       for (const pid of mancanti) {
         if (s.fase === FASI.SPAREGGIO) {
-          // in spareggio i mancanti restano alla propria ultima offerta (mai 0)
-          s.offerte[pid] = s.spareggi >= 2
-            ? (s.ultimoSpareggio[pid] || 1)
-            : (s.offerteRoundPrincipale[pid] || 1);
+          // in spareggio i mancanti restano alla propria puntata del round principale (mai 0)
+          s.offerte[pid] = s.offerteRoundPrincipale[pid] || 1;
         } else {
           s.offerte[pid] = 0; // nell'asta principale i mancanti fanno passo
         }
@@ -278,7 +273,6 @@ class MotoreAsta {
       if (vincenti.length === 1) this._aggiudica(g, vincenti[0], maxV, s.offerte, {});
       else {
         s.fase = FASI.SPAREGGIO;
-        s.pareggioOriginale = maxV;
         s.candidatiSpareggio = vincenti;
         s.offerteRoundPrincipale = { ...s.offerte };
         s.ultimoSpareggio = {};
@@ -286,27 +280,16 @@ class MotoreAsta {
         s.spareggi = 1;
       }
     } else if (s.fase === FASI.SPAREGGIO) {
-      // NUOVE REGOLE SPAREGGIO (27/08/2026): mai ritiro, max 2 round, sorteggio
+      // SPAREGGIO UNICO (regola 07/09/2026): si può ripetere la propria puntata;
+      // qualunque pareggio qui decide la MONETINA (sorteggio automatico)
       const maxV = Math.max(...Object.values(s.offerte));
       const vincenti = Object.entries(s.offerte).filter(([, v]) => v === maxV).map(([k]) => Number(k));
       if (vincenti.length === 1) {
         this._aggiudica(g, vincenti[0], maxV, s.offerteRoundPrincipale, { ...s.offerte });
-      } else if (s.spareggi >= 2) {
-        this._sorteggia(g, vincenti, maxV);
-      } else if (maxV === s.pareggioOriginale) {
-        this._sorteggia(g, vincenti, maxV);
       } else {
-        this._apriSpareggioSuccessivo(g, vincenti);
+        this._sorteggia(g, vincenti, maxV);
       }
     }
-  }
-
-  _apriSpareggioSuccessivo(g, idCandidati) {
-    const s = this.stato;
-    s.candidatiSpareggio = idCandidati;
-    s.ultimoSpareggio = { ...s.offerte };
-    s.offerte = {};
-    s.spareggi += 1;
   }
 
   _sorteggia(g, idCandidati, importo) {
@@ -365,6 +348,20 @@ class MotoreAsta {
     this._evento("NonVenduto", { roundId: s.roundId, idGiocatore: g.id, motivo });
   }
 
+  /** Reinserisce un giocatore in coda dopo l'ultimo del suo reparto rimasto
+   *  da processare (se non ne restano, in fondo): stessa semantica del
+   *  reinserto dei non venduti, riusata per le assegnazioni annullate. */
+  _reinserisciInCoda(g) {
+    const s = this.stato;
+    if (s.coda.includes(g.id)) return;
+    let idx = -1;
+    for (let i = s.coda.length - 1; i >= 0; i--) {
+      if (s.listaById[s.coda[i]].ruolo === g.ruolo) { idx = i; break; }
+    }
+    if (idx >= 0) s.coda.splice(idx + 1, 0, g.id);
+    else s.coda.push(g.id);
+  }
+
   _rivelazione(g, offertePrincipali, idVincitore, importoFinale, spareggi, spareggio,
       nonVenduto, motivo) {
     const s = this.stato;
@@ -379,7 +376,7 @@ class MotoreAsta {
       .map(([k, v]) => ({ partecipante: nomeDi(Number(k)), idPartecipante: Number(k), importo: v }));
     return {
       idGiocatore: g.id,
-      giocatore: { id: g.id, nome: g.nome, ruolo: g.ruolo },
+      giocatore: { id: g.id, nome: g.nome, ruolo: g.ruolo, squadra: g.squadra || "" },
       offerteInOrdine: ordinate,
       passi,
       vincitore: idVincitore != null ? nomeDi(idVincitore) : null,
@@ -431,19 +428,57 @@ class MotoreAsta {
     if (!agg) return { ok: false, errore: "Nessuna aggiudicazione da annullare" };
     if (s.fase !== FASI.RIVELAZIONE || agg.roundId !== s.roundId)
       return { ok: false, errore: "Si può annullare solo l'ultima aggiudicazione, prima di proseguire" };
-    const g = s.listaById[agg.idGiocatore];
-    const sq = s.squadre[agg.idPartecipante];
-    sq.budgetResiduo += agg.importo;
-    sq.rosa = sq.rosa.filter((a) => a.idGiocatore !== g.id);
-    s.fase = FASI.ATTESA;
-    s.offerte = {};
-    s.offerteRoundPrincipale = {};
-    s.ultimoSpareggio = {};
-    s.candidatiSpareggio = [];
-    s.spareggi = 0;
-    s.rivelazione = null;
-    s.ultimaAggiudicazione = null;
-    this._evento("AnnullamentoAggiudicazione", { roundId: agg.roundId, idGiocatore: agg.idGiocatore, idPartecipante: agg.idPartecipante, importo: agg.importo });
+    return this.annullaAssegnazione(agg.idGiocatore);
+  }
+
+  /** Annulla QUALSIASI assegnazione, in qualsiasi momento (richiesta 07/09/2026):
+   *  rimborsa il compratore, toglie il giocatore dalla rosa e lo rimette in gioco
+   *  (se il round è ancora sullo schermo si rifà da capo; se è già passato torna
+   *  in coda dopo l'ultimo giocatore del suo reparto, come i non venduti). */
+  annullaAssegnazione(idGiocatore) {
+    const s = this.stato;
+    const g = s.listaById[idGiocatore];
+    if (!g) return { ok: false, errore: "Giocatore sconosciuto" };
+    const pidVenditore = Object.keys(s.squadre).find((pid) =>
+      s.squadre[pid].rosa.some((a) => a.idGiocatore === idGiocatore));
+    if (pidVenditore == null) return { ok: false, errore: "Questo giocatore non è assegnato a nessuno" };
+    const sq = s.squadre[pidVenditore];
+    const acquisto = sq.rosa.find((a) => a.idGiocatore === idGiocatore);
+    sq.budgetResiduo += acquisto.importo;
+    sq.rosa = sq.rosa.filter((a) => a.idGiocatore !== idGiocatore);
+
+    const roundCorrente = s.fase === FASI.RIVELAZIONE && s.rivelazione
+      && s.rivelazione.idGiocatore === idGiocatore && s.rivelazione.idVincitore != null;
+    if (roundCorrente) {
+      // l'annullamento dell'assegnazione appena rivelata rifà il round da capo
+      s.fase = FASI.ATTESA;
+      s.offerte = {};
+      s.offerteRoundPrincipale = {};
+      s.ultimoSpareggio = {};
+      s.candidatiSpareggio = [];
+      s.spareggi = 0;
+      s.rivelazione = null;
+      s.ultimaAggiudicazione = null;
+    } else {
+      if (s.ultimaAggiudicazione && s.ultimaAggiudicazione.idGiocatore === idGiocatore) s.ultimaAggiudicazione = null;
+      if (s.fase !== FASI.FINE) this._reinserisciInCoda(g);
+      else if (!s.nonVenduti.includes(g.id)) s.nonVenduti.push(g.id);
+    }
+    const nomeDi = (id) => { const p = s.partecipanti.find((x) => x.id === Number(id)); return p ? p.nome : "#" + id; };
+    this._evento("AnnullamentoAggiudicazione", { idGiocatore: g.id, idPartecipante: Number(pidVenditore), importo: acquisto.importo });
+    return { ok: true, giocatore: g.nome, partecipante: nomeDi(pidVenditore), importo: acquisto.importo };
+  }
+
+  /** Il banditore può correggere i crediti di chiunque in qualsiasi momento (07/09/2026). */
+  impostaBudget(pid, budget) {
+    const s = this.stato;
+    if (!s.squadre[pid]) return { ok: false, errore: "Partecipante sconosciuto" };
+    const n = Number(budget);
+    if (!Number.isInteger(n) || n < 0 || n > 99999) return { ok: false, errore: "Crediti non validi (0–99999)" };
+    const prima = s.squadre[pid].budgetResiduo;
+    if (n === prima) return { ok: true };
+    s.squadre[pid].budgetResiduo = n;
+    this._evento("BudgetModificato", { idPartecipante: pid, da: prima, a: n });
     return { ok: true };
   }
 
@@ -533,6 +568,7 @@ const ParserLista = {
     const H_NOME = new Set(["nome", "giocatore", "calciatore", "name"]);
     const H_RUOLO = new Set(["ruolo", "r", "pos", "posizione"]);
     const H_QUOT = new Set(["quotazione", "quot", "qt", "prezzo", "q base", "base", "fmm"]);
+    const H_SQ = new Set(["squadra", "team", "club", "societa"]);
     const prima = righe[0].map(norm);
     const hadHeader = prima.some((c) => H_NOME.has(c) || H_RUOLO.has(c) || H_QUOT.has(c));
     let col;
@@ -540,16 +576,18 @@ const ParserLista = {
       const iN = prima.findIndex((c) => H_NOME.has(c));
       const iR = prima.findIndex((c) => H_RUOLO.has(c));
       const iQ = prima.findIndex((c) => H_QUOT.has(c));
+      const iS = prima.findIndex((c) => H_SQ.has(c));
       if (iN < 0 || iR < 0) {
         errori.push(`Intestazioni riconosciute ma manca la colonna ${iN < 0 ? "Nome" : "Ruolo"}`);
         return { giocatori: [], errori, righeLette: righe.length, avvisi };
       }
       if (iQ < 0) avvisi.push("Colonna quotazione non trovata: quotazioni a 0");
-      col = { nome: iN, ruolo: iR, quot: iQ >= 0 ? iQ : null };
+      col = { nome: iN, ruolo: iR, quot: iQ >= 0 ? iQ : null, sq: iS >= 0 ? iS : null };
     } else {
       if (righe[0].length < 2) errori.push("Servono almeno 2 colonne: Nome e Ruolo");
       else if (righe[0].length < 3) avvisi.push("Terza colonna assente: quotazioni a 0");
-      col = { nome: 0, ruolo: 1, quot: righe[0].length >= 3 ? 2 : null };
+      // quarta colonna posizionale = squadra (opzionale, retrocompatibile)
+      col = { nome: 0, ruolo: 1, quot: righe[0].length >= 3 ? 2 : null, sq: righe[0].length >= 4 ? 3 : null };
       if (righe[0].length < 2) return { giocatori: [], errori, righeLette: righe.length, avvisi };
     }
     const giocatori = [];
@@ -566,7 +604,8 @@ const ParserLista = {
       const qTxt = col.quot != null ? String(riga[col.quot] || "") : "";
       const quotazione = parseIntero(qTxt);
       if (qTxt.trim() !== "" && quotazione == null) avvisi.push(`Riga ${numRiga}: quotazione "${qTxt}" non numerica → 0`);
-      giocatori.push({ id: giocatori.length, nome, ruolo, quotazioneBase: quotazione || 0 });
+      const squadra = col.sq != null ? String(riga[col.sq] || "").trim() : "";
+      giocatori.push({ id: giocatori.length, nome, ruolo, quotazioneBase: quotazione || 0, squadra });
       const k = nome.toLowerCase();
       visti[k] = (visti[k] || 0) + 1;
     });
@@ -924,7 +963,7 @@ function creaServer(opzioni = {}) {
     return {
       ...base,
       preAvvio: false,
-      giocatore: g ? { nome: g.nome, ruolo: g.ruolo, quotazioneBase: g.quotazioneBase } : null,
+      giocatore: g ? { nome: g.nome, ruolo: g.ruolo, quotazioneBase: g.quotazioneBase, squadra: g.squadra || "" } : null,
       banditore: true,
       partecipanti: s.partecipanti.map((p) => ({
         id: p.id, nome: p.nome,
@@ -932,7 +971,7 @@ function creaServer(opzioni = {}) {
         budgetResiduo: s.squadre[p.id].budgetResiduo,
         rosa: s.squadre[p.id].rosa.length,
       })),
-      spareggio: s.fase === "SPAREGGIO" ? { pari: sessione.motore._pariCorrente(), min: sessione.motore._minSpareggio(sessione.motore._pariCorrente()) } : null,
+      spareggio: s.fase === "SPAREGGIO" ? { pari: sessione.motore._pariCorrente() } : null,
       rivelazione: s.rivelazione,
       squadre: vistaSquadre(),
       tuttiCompleti: sessione.motore.tuttiCompleti,
@@ -957,7 +996,7 @@ function creaServer(opzioni = {}) {
     const out = {
       ...baseP,
       preAvvio: false,
-      giocatore: g ? { nome: g.nome, ruolo: g.ruolo } : null, // NIENTE quotazione base qui
+      giocatore: g ? { nome: g.nome, ruolo: g.ruolo, quotazioneBase: g.quotazioneBase, squadra: g.squadra || "" } : null,
       mioStato: sessione.motore.statoBid(pid),
       minOfferta: sessione.motore.minOffertaCorrente(),
       maxOfferta: sessione.motore.maxOfferta(pid),
@@ -968,7 +1007,7 @@ function creaServer(opzioni = {}) {
           : [],
       daConsegnare: sessione.motore.interrogabili().filter((p) => p.id === pid).length > 0,
       spareggio: s.fase === "SPAREGGIO"
-        ? { pari: sessione.motore._pariCorrente(), min: sessione.motore._minSpareggio(sessione.motore._pariCorrente()), candidato: s.candidatiSpareggio.includes(pid) }
+        ? { pari: sessione.motore._pariCorrente(), min: s.offerteRoundPrincipale[pid] || 1, candidato: s.candidatiSpareggio.includes(pid) }
         : null,
       budgetResiduo: s.squadre[pid].budgetResiduo,
       rosaCount: s.squadre[pid].rosa.length,
@@ -986,8 +1025,10 @@ function creaServer(opzioni = {}) {
       nome: p.nome,
       budgetResiduo: s.squadre[p.id].budgetResiduo,
       rosa: s.squadre[p.id].rosa.map((a) => ({
+        idGiocatore: a.idGiocatore,
         nome: s.listaById[a.idGiocatore].nome,
         ruolo: s.listaById[a.idGiocatore].ruolo,
+        squadra: s.listaById[a.idGiocatore].squadra || "",
         importo: a.importo,
       })),
     }));
@@ -1163,7 +1204,7 @@ function creaServer(opzioni = {}) {
         nuova.quote = { P: c.quote.P, D: c.quote.D, C: c.quote.C, A: c.quote.A };
       if (Array.isArray(c.ordineRuoli) && new Set(c.ordineRuoli).size === 4 && c.ordineRuoli.every((r) => "PDCA".includes(r)))
         nuova.ordineRuoli = c.ordineRuoli;
-      for (const k of ["regolaResto", "baseComeMinimo", "ordineCasuale", "spareggioDaPari"])
+      for (const k of ["regolaResto", "baseComeMinimo", "ordineCasuale"])
         if (typeof c[k] === "boolean") nuova[k] = c[k];
       sessione.config = nuova;
       dopoMossa();
@@ -1234,6 +1275,13 @@ function creaServer(opzioni = {}) {
           try { sessione.motore.prossimo(); esito = { ok: true }; } catch (e) { esito = { ok: false, errore: e.message }; }
           break;
         case "annulla": esito = sessione.motore.annullaUltimaAggiudicazione(); break;
+        case "annullaAssegnazione":
+          if (!Number.isInteger(Number(dati.idGiocatore))) { esito = { ok: false, errore: "idGiocatore mancante" }; break; }
+          esito = sessione.motore.annullaAssegnazione(Number(dati.idGiocatore));
+          break;
+        case "setBudget":
+          esito = sessione.motore.impostaBudget(Number(dati.pid), dati.budget);
+          break;
         case "termina": sessione.motore.termina(); esito = { ok: true }; break;
         default: return json(res, 400, { errore: "Azione sconosciuta" });
       }

@@ -365,15 +365,18 @@ function generaXlsx(stato) {
     righe.push([]);
     righe.push([
       { v: "Round", s: 1 }, { v: "Giocatore", s: 15 }, { v: "Ruolo", s: 1 },
-      { v: "Quot. base", s: 1 }, { v: "Vincitore", s: 15 }, { v: "Pagato", s: 1 },
+      { v: "Squadra", s: 14 }, { v: "Quot. base", s: 1 }, { v: "Vincitore", s: 15 }, { v: "Pagato", s: 1 },
       { v: "Offerte (dal più basso)", s: 15 }, { v: "Passi", s: 15 }, { v: "Note", s: 15 }
     ]);
 
-    // ricostruisci da eventi
+    // ricostruisci da eventi (l'ordine cronologico decide: un annullamento
+    // toglie l'assegnazione, una nuova aggiudicazione successiva la riassegna)
     const aggiudicazioni = new Map();
+    const annullati = new Set();
     const nonVendutiSet = new Set(stato.nonVenduti);
     for (const ev of stato.eventi) {
-      if (ev.tipo === "Aggiudicazione" || ev.tipo === "Sorteggio") aggiudicazioni.set(ev.idGiocatore, ev);
+      if (ev.tipo === "Aggiudicazione" || ev.tipo === "Sorteggio") { aggiudicazioni.set(ev.idGiocatore, ev); annullati.delete(ev.idGiocatore); }
+      if (ev.tipo === "AnnullamentoAggiudicazione") { aggiudicazioni.delete(ev.idGiocatore); annullati.add(ev.idGiocatore); }
     }
 
     const offertePerRound = new Map();
@@ -399,7 +402,8 @@ function generaXlsx(stato) {
       const passiTxt = passi.map(o => nomeDi(o.idPartecipante)).join(", ");
 
       let nota = "";
-      if (!agg && nonVendutiSet.has(g.id)) nota = "SVINCOLATO";
+      if (annullati.has(g.id)) nota = nonVendutiSet.has(g.id) ? "ANNULLATO → SVINCOLATO" : "ANNULLATO";
+      else if (!agg && nonVendutiSet.has(g.id)) nota = "SVINCOLATO";
       if (agg && stato.eventi.some(e => e.tipo === "Sorteggio" && e.idGiocatore === g.id)) nota = "SORTEGGIO";
 
       const isWinner = !!agg;
@@ -407,6 +411,7 @@ function generaXlsx(stato) {
         { v: roundCorrente, s: alt ? 17 : 17 },
         { v: g.nome, s: isWinner ? 11 : (alt ? 2 : 0) },
         { v: g.ruolo, s: { P: 5, D: 6, C: 7, A: 8 }[g.ruolo] || 0 },
+        { v: g.squadra || "", s: alt ? 2 : 0 },
         { v: g.quotazioneBase, s: alt ? 4 : 3 },
         { v: nomeVincitore, s: isWinner ? 11 : (alt ? 2 : 0) },
         { v: pagato, s: isWinner ? (alt ? 4 : 3) : (alt ? 17 : 17) },
@@ -416,7 +421,7 @@ function generaXlsx(stato) {
       ]);
       alt = !alt;
     }
-    x.aggiungiFoglio("Asta completa", righe, [8, 22, 7, 10, 16, 10, 40, 25, 12]);
+    x.aggiungiFoglio("Asta completa", righe, [8, 22, 7, 16, 10, 16, 10, 40, 25, 12]);
   }
 
   // ------------------------------------------------ S4: ANALISI

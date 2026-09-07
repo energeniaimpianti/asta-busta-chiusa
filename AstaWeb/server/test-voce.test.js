@@ -264,6 +264,36 @@ test("voce: saltato dal banditore — annunciato il salto, senza prese in giro",
   assert.ok(ann.includes("12"), "l'offerta già fatta non viene letta: " + ann);
 });
 
+test("voce: con spareggio NON si ripete l'asta iniziale — si racconta SOLO l'ultimo rilancio", () => {
+  const { generaAnnuncio } = motoreFresco();
+  // main 20-20 (+Zoe passa), spareggio 28-30: la voce deve dire 28 e 30, MAI 20
+  const r = riv({
+    offerteInOrdine: [off("Dario", 20), off("Franco", 20)],
+    passi: ["Zoe", "Anna", "Bob"],
+    vincitore: "Franco", importoFinale: 30, spareggi: 1,
+    spareggio: [off("Dario", 28), off("Franco", 30)],
+  });
+  for (let seme = 1; seme <= 60; seme++) {
+    const ann = generaAnnuncio(r, rngConSeme(seme));
+    assert.ok(ann.includes("Pareggio! Si va allo spareggio."), "spareggio non annunciato: " + ann);
+    assert.ok(ann.includes("28") && ann.includes("30"), "offerte di spareggio non lette: " + ann);
+    assert.ok(!/\b20\b/.test(ann), "il pareggio del round principale non va più ripetuto: " + ann);
+    assert.ok(!ann.includes("Zoe"), "chi ha passato non va nominato: " + ann);
+  }
+  // sorteggio: stessa regola — solo lo spareggio
+  const rs = riv({
+    offerteInOrdine: [off("Dario", 44), off("Franco", 44)],
+    vincitore: "Franco", importoFinale: 44, spareggi: 1,
+    spareggio: [off("Dario", 44), off("Franco", 44)],
+    sorteggiato: true,
+  });
+  for (let seme = 1; seme <= 60; seme++) {
+    const ann = generaAnnuncio(rs, rngConSeme(seme));
+    assert.ok(ann.includes("Pareggio insuperabile!"), "manca il pareggio insuperabile: " + ann);
+    assert.ok(ann.includes("44"), "importo di spareggio non letto: " + ann);
+  }
+});
+
 // ------------------------------------------------------------ anti-ripetizione e determinismo
 
 test("voce: mai due annunci uguali consecutivi (500 giri sullo stesso round)", () => {

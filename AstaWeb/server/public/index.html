@@ -10,14 +10,17 @@
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   body { margin:0; font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif; background:linear-gradient(165deg,#0e1a12 0%,#101f15 55%,#0d161e 100%) fixed var(--bg); color:var(--testo); }
   .contenitore { max-width:520px; margin:0 auto; padding:16px 14px 80px; }
-  @media (min-width:900px) {
-    .contenitore { max-width:1100px; padding:20px 24px 60px; }
+  /* tablet (ritratto/paesaggio piccolo): più aria e tocchi più larghi */
+  @media (min-width:780px) {
+    .contenitore { max-width:900px; padding:20px 22px 60px; }
     .due-colonne { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     .giocatore-nome { font-size:52px !important; }
     .display { font-size:64px !important; }
     .pad button { font-size:32px !important; padding:24px 0 !important; }
     .card { padding:20px; }
-    .offerta-riga { font-size:24px !important; }
+  }
+  @media (min-width:1100px) {
+    .contenitore { max-width:1100px; }
   }
   .sticky-header {
     position:sticky; top:0; z-index:100;
@@ -56,6 +59,20 @@
   .pop { animation:pop .5s ease; }
   @keyframes pop { 0% { transform:scale(.9); opacity:.2; } 100% { transform:scale(1); opacity:1; } }
   .giocatore-nome { font-size:40px; font-weight:900; text-align:center; line-height:1.05; margin:8px 0; word-break:break-word; letter-spacing:.5px; }
+  /* quotazione minima: EVIDENTE, subito sotto il nome del giocatore */
+  .quot-min {
+    display:inline-block; margin:2px auto 6px; padding:8px 22px;
+    border:2px solid #2e86c1; border-radius:14px; background:#132530;
+    font-size:15px; font-weight:700; letter-spacing:.3px;
+  }
+  .quot-min b { font-size:30px; font-weight:900; color:#5dade2; margin:0 4px; }
+  @media (min-width:780px) { .quot-min { font-size:17px; } .quot-min b { font-size:38px; } }
+  /* squadra di appartenenza: sotto il nome, sopra la quotazione minima */
+  .squadra-gioc {
+    font-size:17px; font-weight:700; text-align:center; margin:2px 0 4px;
+    color:#cfe3d4; letter-spacing:.4px;
+  }
+  @media (min-width:780px) { .squadra-gioc { font-size:20px; } }
   .badge-ruolo { display:inline-flex; align-items:center; gap:8px; padding:4px 14px; border-radius:999px; font-weight:700; color:#fff; }
   .r-P { background:#f9a825; color:#3b2c00; } .r-D { background:#1565c0; } .r-C { background:#2e7d32; } .r-A { background:#c62828; }
   .centro { text-align:center; }
@@ -68,6 +85,11 @@
   .pad { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:14px 0; }
   .pad button { padding:18px 0; font-size:26px; font-weight:800; border:0; border-radius:14px; background:#1d3625; color:var(--testo); }
   .pad button:active { background:var(--verdeScuro); transform:scale(.95); }
+  /* Passo e Consegna in due zone distanti: impossibile sbagliare tocco */
+  .riga-buste { display:grid; grid-template-columns:1fr 1.55fr; gap:18px; align-items:stretch; margin-top:4px; }
+  .riga-buste #passo { font-size:15px; padding:14px 6px; }
+  .riga-buste #consegna { font-size:18px; }
+  @media (min-width:780px) { .riga-buste { gap:28px; } .riga-buste #passo { font-size:17px; } .riga-buste #consegna { font-size:20px; } }
   .display { text-align:center; font-size:52px; font-weight:900; min-height:64px; }
   .chip { display:inline-block; padding:4px 10px; margin:3px; border-radius:999px; background:#1d3625; font-size:13px; }
   .chip.ok { background:#1c4a26; color:#9be7ae; }
@@ -242,15 +264,20 @@ function schermataPre() {
 
 function pannelloAsta() {
   const g = vista.giocatore;
+  const inSpareggio = vista.fase === "SPAREGGIO" && vista.spareggio;
   let html = `<div class="card centro ruolo-${g.ruolo}">
     <span class="badge-ruolo r-${g.ruolo}">${g.ruolo} · ${g.ruolo === "P" ? "Portiere" : g.ruolo === "D" ? "Difensore" : g.ruolo === "C" ? "Centrocampista" : "Attaccante"}</span>
     <div class="giocatore-nome">${esc(g.nome)}</div>
+    ${g.squadra ? `<div class="squadra-gioc">🛡 ${esc(g.squadra)}</div>` : ""}
+    <div class="quot-min">Quotazione minima<b>${g.quotazioneBase}</b>FMM</div>
   </div>`;
 
-  if (vista.fase === "SPAREGGIO" && vista.spareggio) {
+  if (inSpareggio) {
     html += `<div class="card" style="background:#33290f">
       <b>⚖ Spareggio${vista.spareggio.candidato ? "" : " (non ti riguarda)"}</b> al pari di ${vista.spareggio.pari} FMM.<br>
-      <span class="muto">${vista.spareggio.candidato ? "Nuova busta da " + vista.spareggio.min + " FMM in su (0 = ritiro)." : "Aspetta l'esito."}</span>
+      <span class="muto">${vista.spareggio.candidato
+        ? "Consegna una nuova busta: puoi <b>ripetere i tuoi " + vista.spareggio.min + " FMM</b> o puntare più alto. Non ci si ritira, e un altro pareggio decide la monetina."
+        : "Aspetta l'esito: chi era in parità rilancia."}</span>
     </div>`;
   }
 
@@ -261,18 +288,21 @@ function pannelloAsta() {
   </div>`;
 
   if (vista.daConsegnare && vista.mioStato === "IN_ATTESA") {
+    const min = inSpareggio ? vista.spareggio.min : vista.minOfferta;
     html += `<div class="card">
       <div class="display" id="display">${cifra || "—"}</div>
-      <div class="muto centro">min ${vista.minOfferta} · max ${vista.maxOfferta} · 0 = ${vista.fase === "SPAREGGIO" ? "ritiro" : "passo"}</div>
-      <div class="pad">${["1","2","3","4","5","6","7","8","9","0","⌫","C"].map((t) => `<button data-t="${t}">${t}</button>`).join("")}</div>
-      <button class="btn btn-secondario" id="passo">Passo (0)</button>
-      <div style="height:10px"></div>
-      <button class="btn" id="consegna">Consegna busta</button>
+      <div class="muto centro">${inSpareggio
+        ? `min ${min} (puoi ripetere la tua puntata) · max ${vista.maxOfferta}`
+        : `min ${vista.minOfferta} · max ${vista.maxOfferta} · 0 = passo`}</div>
+      <div class="pad">${["1","2","3","4","5","6","7","8","9","0","⌫","C"].map((t) =>
+        `<button data-t="${t}" ${inSpareggio && t === "0" ? 'disabled style="opacity:.25"' : ""}>${t}</button>`).join("")}</div>
+      <div class="riga-buste">
+        ${inSpareggio ? "" : `<button class="btn btn-secondario" id="passo">Passo (0)</button>`}
+        <button class="btn" id="consegna" style="grid-column:${inSpareggio ? "1 / -1" : "auto"}">Consegna busta</button>
+      </div>
     </div>`;
   } else if (vista.mioStato === "PUNTATO") {
     html += `<div class="card centro pop"><div style="font-size:44px">✅</div><b>Busta consegnata.</b><br><span class="muto">Nessuno può vedere la tua offerta. Aspetta le altre buste.</span></div>`;
-  } else if (vista.mioStato === "RITIRATO") {
-    html += `<div class="card centro"><b>🏳 Ti sei ritirato dallo spareggio.</b></div>`;
   } else if (vista.mioStato === "ESCLUSO_REPARTO") {
     html += `<div class="card centro"><b>🚫 Reparto completo</b><br><span class="muto">Hai già riempito questo reparto: per questo giocatore non puoi puntare.</span></div>`;
   } else if (vista.mioStato === "FUORI_BUDGET") {
@@ -293,6 +323,7 @@ function pannelloRivelazione() {
   let html = `<div class="card">
     <div class="muto centro">Asta chiusa per</div>
     <div class="giocatore-nome">${esc(r.giocatore.nome)}</div>
+    ${r.giocatore.squadra ? `<div class="centro squadra-gioc">🛡 ${esc(r.giocatore.squadra)}</div>` : ""}
     <div id="offerte">`;
   r.offerteInOrdine.forEach((o, i) => {
     html += `<div class="offre" data-i="${i}"><span>${esc(o.partecipante)}</span><b>${o.importo}</b></div>`;
@@ -443,7 +474,8 @@ document.addEventListener("click", async (e) => {
   } else if (t.id === "consegna") {
     const v = parseInt(cifra, 10);
     if (!Number.isInteger(v) || String(v) !== cifra) { toast("Digita la tua offerta"); return; }
-    if (v !== 0 && (v < vista.minOfferta || v > vista.maxOfferta)) { toast(`Offerta tra ${vista.minOfferta} e ${vista.maxOfferta}`); return; }
+    const min = (vista.fase === "SPAREGGIO" && vista.spareggio) ? vista.spareggio.min : vista.minOfferta;
+    if (v !== 0 && (v < min || v > vista.maxOfferta)) { toast(`Offerta tra ${min} e ${vista.maxOfferta}`); return; }
     try { await post("/api/offerta", { pid, token, importo: v }); cifra = ""; } catch (err) { toast(err.message); }
   }
 });

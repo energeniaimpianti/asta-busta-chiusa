@@ -244,16 +244,17 @@ function generaAnnuncio(r, rng) {
 }
 
 // sorteggio: i due finalisti hanno offerto LO STESSO importo, ha deciso la
-// sorte — le frasi finali parlano solo di sorte, mai di rilancio vincente
+// sorte — l'annuncio NON ripete l'asta iniziale: si racconta solo lo spareggio
 function generaSorteggio(r, rng) {
   const rnd = rng || Math.random;
   const g = r.giocatore.nome;
   let t = _tmpl(_pick(APERTURE, "ap", rnd), { giocatore: g }) + " ";
-  t = _legge(t, r.offerteInOrdine.slice(-_n(3, 4, rnd)), rnd);
   const dett = _spareggioNarrabile(r);
   if (dett) {
     t += "Pareggio! Si va allo spareggio. ";
     t = _legge(t, dett, rnd);
+  } else {
+    t = _legge(t, r.offerteInOrdine.slice(-_n(3, 4, rnd)), rnd);
   }
   if (r.importoFinale >= 25) t += _pick(SUSPENSE, "su", rnd) + " ";
   t += `Pareggio insuperabile! ${g}... `;
@@ -310,7 +311,13 @@ function generaAggiudicazione(r, rng) {
   const struttura = Math.floor(rnd() * 5);
   let t = _tmpl(_pick(APERTURE, "ap", rnd), { giocatore: g }) + " ";
 
-  if (struttura === 4) {
+  // se c'è stato lo spareggio la voce NON ripete l'asta iniziale: si racconta
+  // SOLO l'ultimo rilancio (le buste del round principale restano sullo schermo)
+  const dett = _spareggioNarrabile(r);
+  if (dett) {
+    t += "Pareggio! Si va allo spareggio. ";
+    t = _legge(t, dett, rnd);
+  } else if (struttura === 4) {
     // FIX #3: struttura TELEGRAFICA (solo i due valori finali, niente letture)
     const ultime2 = r.offerteInOrdine.slice(-2);
     for (const o of ultime2) t += `${o.partecipante}: ${o.importo}. `;
@@ -322,14 +329,6 @@ function generaAggiudicazione(r, rng) {
   const numPassi = (r.passi || []).length;
   if (numPassi > 0 && r.offerteInOrdine.length <= 2) {
     t += numPassi === 1 ? "Gli altri passano. " : `Tutti gli altri passano (${numPassi}). `;
-  }
-
-  // FIX coerenza: lo spareggio va raccontato, altrimenti il salto di prezzo
-  // (es. lette pari a 20 e poi "per 30!") resta inspiegato
-  const dett = _spareggioNarrabile(r);
-  if (dett) {
-    t += "Pareggio! Si va allo spareggio. ";
-    t = _legge(t, dett, rnd);
   }
 
   // helper per i commenti (FIX #2: alto+risicato = entrambi)

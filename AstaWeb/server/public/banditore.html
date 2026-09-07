@@ -17,6 +17,30 @@
   .card.ruolo-C { border-left:4px solid #2e7d32; } .card.ruolo-A { border-left:4px solid #c62828; }
   .centro { text-align:center; }
   .giocatore-nome { font-size:44px; font-weight:900; text-align:center; line-height:1.05; margin:6px 0; letter-spacing:1px; }
+  /* quotazione minima: EVIDENTE, subito sotto il nome del giocatore */
+  .quot-min {
+    display:inline-block; margin:2px auto 6px; padding:8px 22px;
+    border:2px solid #2e86c1; border-radius:14px; background:#132530;
+    font-size:15px; font-weight:700; letter-spacing:.3px;
+  }
+  .quot-min b { font-size:30px; font-weight:900; color:#5dade2; margin:0 4px; }
+  /* squadra di appartenenza: sotto il nome, sopra la quotazione minima */
+  .squadra-gioc {
+    font-size:17px; font-weight:700; text-align:center; margin:2px 0 4px;
+    color:#c8d8ea; letter-spacing:.4px;
+  }
+  /* comandi rari: ripiegati, per non premere TERMINA per sbaglio */
+  .comandi-rari { margin-top:10px; text-align:center; }
+  .comandi-rari summary { font-size:13px; color:var(--muto); font-weight:600; }
+  .comandi-rari .btn { margin-top:8px; font-size:13px; padding:10px 16px; }
+  /* regie del banditore: annulla assegnazioni e crediti */
+  .regia-sq { padding:10px 0; border-bottom:1px solid #22334a; }
+  .regia-sq:last-child { border-bottom:0; }
+  .regia-testa { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+  .regia-budget { display:flex; align-items:center; gap:6px; }
+  .regia-budget input { width:88px; padding:6px 8px; font-size:15px; text-align:right; border-radius:8px; border:2px solid #2b3b50; background:#0a111c; color:var(--testo); }
+  .regia-riga { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:4px 0; font-size:14px; flex-wrap:wrap; }
+  .regia-riga .mini { font-size:13px; padding:4px 10px; }
   .badge-ruolo { display:inline-block; padding:4px 14px; border-radius:999px; font-weight:700; color:#fff; }
   .r-P { background:#f9a825; color:#3b2c00; } .r-D { background:#1565c0; } .r-C { background:#2e7d32; } .r-A { background:#c62828; }
   input[type=text], input[type=number] { width:100%; padding:10px 12px; font-size:16px; border-radius:10px; border:2px solid #2b3b50; background:#0a111c; color:var(--testo); }
@@ -322,7 +346,7 @@ function render() {
   tieneSvegio(); // durante l'asta lo schermo del banditore resta acceso
   let html = intestazione() + barraVoce();
   html += (vista.fase === "RIVELAZIONE") ? pannelloRivelazione() : (pannelloGiocatore() + pannelloPartecipanti() + pannelloAzioni());
-  html += `<details><summary>📋 Squadre (aggiornate in tempo reale)</summary>${tabellaSquadre()}</details>`;
+  html += `<details><summary>📋 Squadre (aggiornate in tempo reale)</summary>${tabellaSquadre()}${pannelloRegie()}</details>`;
   $app.innerHTML = html;
   popolaVoci();
   if (vista.fase === "RIVELAZIONE") avviaRivelazione();
@@ -367,7 +391,7 @@ function schermataSetup() {
 
   <div class="card">
     <h2 style="margin-top:0">3 · Lista giocatori (Excel .xlsx o CSV)</h2>
-    <p class="muto">Colonne: Nome · Ruolo · Quotazione (la quotazione NON sarà mai mostrata ai partecipanti).</p>
+    <p class="muto">Colonne: Nome · Ruolo · Quotazione · Squadra (opzionale, mostrata sotto il nome del giocatore). La quotazione è visibile a tutti come "Quotazione minima".</p>
     <input type="file" id="file-lista" accept=".xlsx,.csv">
     <div id="esito-lista">${esitoLista ? riepilogoLista(esitoLista) : ""}</div>
   </div>
@@ -392,7 +416,6 @@ function schermataSetup() {
         <button class="mini" data-giu="${i}" style="padding:0 6px" ${i === ord.length - 1 ? "disabled" : ""}>↓</button>
       </span>`).join("")}</div>
     ${interruttore("regolaResto", "Regola del resto", "max = budget − (slot vuoti − 1)")}
-    ${interruttore("spareggioDaPari", "Spareggio da pari + 1", "al pareggio si rilancia da pari + 1")}
     ${interruttore("baseComeMinimo", "Quotazione base = minimo", "il prezzo base del file diventa l'offerta minima")}
     ${interruttore("ordineCasuale", "Ordine casuale nel reparto", "mescola i giocatori dentro ogni reparto")}
   </div>
@@ -503,25 +526,54 @@ function pannelloGiocatore() {
   return `<div class="card centro ruolo-${g.ruolo}">
     <span class="badge-ruolo r-${g.ruolo}">${g.ruolo} · ${{P:"Portiere",D:"Difensore",C:"Centrocampista",A:"Attaccante"}[g.ruolo]}</span>
     <div class="giocatore-nome">${esc(g.nome)}</div>
-    <div class="muto">quotazione base (solo tu la vedi): <b>${g.quotazioneBase}</b></div>
-    ${vista.spareggio ? `<div style="margin-top:8px"><b>⚖ Spareggio al pari di ${vista.spareggio.pari}</b> — buste da ${vista.spareggio.min} in su</div>` : ""}
+    ${g.squadra ? `<div class="squadra-gioc">🛡 ${esc(g.squadra)}</div>` : ""}
+    <div class="quot-min">Quotazione minima<b>${g.quotazioneBase}</b>FMM</div>
+    ${vista.spareggio ? `<div style="margin-top:6px"><b>⚖ Spareggio al pari di ${vista.spareggio.pari}</b> — ognuno dei pari può ripetere la propria puntata o salire: altro pareggio = monetina</div>` : ""}
   </div>`;
 }
 
 function pannelloPartecipanti() {
   return `<div class="griglia-p">${vista.partecipanti.map((p) => {
-    const cls = p.stato === "PUNTATO" || p.stato === "RITIRATO" ? "ok" : (p.stato === "IN_ATTESA" ? "" : "no");
-    const etichetta = { IN_ATTESA:"⏳ deve consegnare", PUNTATO:"✅ busta chiusa", ESCLUSO_REPARTO:"🚫 reparto completo", FUORI_BUDGET:"💰 budget", FUORI_SPAREGGIO:"— fuori spareggio", RITIRATO:"🏳 ritirato" }[p.stato] || p.stato;
+    const cls = p.stato === "PUNTATO" ? "ok" : (p.stato === "IN_ATTESA" ? "" : "no");
+    const etichetta = { IN_ATTESA:"⏳ deve consegnare", PUNTATO:"✅ busta chiusa", ESCLUSO_REPARTO:"🚫 reparto completo", FUORI_BUDGET:"💰 budget", FUORI_SPAREGGIO:"— fuori spareggio" }[p.stato] || p.stato;
     return `<div class="part-tile ${cls}"><b>${esc(p.nome)}</b><br><span class="muto">${p.budgetResiduo} FMM · rosa ${p.rosa}/25</span><br>${etichetta}</div>`;
   }).join("")}</div>`;
 }
 
 function pannelloAzioni() {
+  // TERMINA è volutamente ripiegato nei "comandi rari": non deve mai partire per sbaglio
   return `<div class="riga-azioni">
     <button class="btn btn-scuro" data-azione="forza">🔔 Chiudi ora</button>
     <button class="btn btn-scuro" data-azione="salta">⏭ Salta</button>
+  </div>
+  <details class="comandi-rari"><summary>⚙️ Comandi rari</summary>
     <button class="btn btn-rosso" data-azione="termina">⏹ Termina serata</button>
-  </div>`;
+  </details>`;
+}
+
+/** Regie del banditore: annullare QUALSIASI assegnazione e correggere i crediti,
+ *  in qualsiasi momento (anche a fine asta, prima di scaricare l'Excel). */
+function pannelloRegie() {
+  if (!vista.squadre) return "";
+  return `<details class="regie"><summary>🛠 Regie del banditore — annulla assegnazioni e crediti</summary>
+    <div class="card">
+      <p class="muto" style="margin:4px 0 8px">Annullare un'assegnazione restituisce i crediti e rimette il giocatore in gioco. I crediti si possono correggere in qualunque momento.</p>
+      ${vista.squadre.map((s) => `
+      <div class="regia-sq">
+        <div class="regia-testa">
+          <b>${esc(s.nome)}</b> <span class="muto">(${s.rosa.length}/25)</span>
+          <span class="regia-budget">crediti
+            <input type="number" id="budget-${s.id}" min="0" max="99999" value="${s.budgetResiduo}">
+            <button class="mini" data-setbudget="${s.id}">✎ Imposta</button>
+          </span>
+        </div>
+        ${s.rosa.map((a) => `<div class="regia-riga">
+          <span>${esc(a.nome)} <span class="muto">${a.ruolo}</span></span>
+          <span><b>${a.importo}</b> FMM <button class="mini" data-annulla-g="${a.idGiocatore}" title="annulla questa assegnazione">↩ annulla</button></span>
+        </div>`).join("") || '<div class="muto" style="padding:4px 0">Nessun acquisto.</div>'}
+      </div>`).join("")}
+    </div>
+  </details>`;
 }
 
 let rivelati = 0, timerRiv = null, ultimoRoundAnnunciato = -1;
@@ -537,6 +589,7 @@ function pannelloRivelazione() {
   let html = `<div class="card">
     <div class="muto centro">Asta chiusa per</div>
     <div class="giocatore-nome">${esc(r.giocatore.nome)}</div>
+    ${r.giocatore.squadra ? `<div class="centro squadra-gioc">🛡 ${esc(r.giocatore.squadra)}</div>` : ""}
     <div id="offerte">`;
   r.offerteInOrdine.forEach((o, i) => { html += `<div class="offre" data-i="${i}"><span>${esc(o.partecipante)}</span><b>${o.importo}</b></div>`; });
   if (r.spareggi > 0 && r.spareggio.length) {
@@ -646,7 +699,8 @@ function schermataFine() {
     <div style="height:10px"></div>
     <button class="btn btn-rosso btn-grande" id="nuova">🆕 Nuova asta (cancella tutto)</button>
   </div>
-  ${tabellaSquadre()}`;
+  ${tabellaSquadre()}
+  ${pannelloRegie()}`;
 }
 
 // ------------------------------------------------------------------ eventi
@@ -688,6 +742,21 @@ document.addEventListener("click", async (e) => {
   if (t.id === "nuova") {
     if (!confirm("Azzerare definitivamente squadre e sessione?")) return;
     try { await post("/api/nuova", { pin }); location.reload(); } catch (err) { toast(err.message); }
+    return;
+  }
+  if (t.dataset.setbudget != null) {
+    const id = Number(t.dataset.setbudget);
+    const v = parseInt((document.getElementById("budget-" + id) || {}).value, 10);
+    if (!Number.isInteger(v)) { toast("Crediti non validi"); return; }
+    try { await post("/api/azione", { pin, azione: "setBudget", pid: id, budget: v }); toast("Crediti aggiornati"); } catch (err) { toast(err.message); }
+    return;
+  }
+  if (t.dataset.annullaG != null) {
+    if (!confirm("Annullare questa assegnazione? I crediti tornano al proprietario e il giocatore rientra in gioco.")) return;
+    try {
+      const j = await post("/api/azione", { pin, azione: "annullaAssegnazione", idGiocatore: Number(t.dataset.annullaG) });
+      toast("Annullato: " + j.giocatore + " (era di " + j.partecipante + " per " + j.importo + ")");
+    } catch (err) { toast(err.message); }
     return;
   }
   const az = t.dataset.azione;
