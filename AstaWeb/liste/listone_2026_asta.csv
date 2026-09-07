@@ -1,0 +1,592 @@
+nome;ruolo;squadra;base
+Malen;A;Roma;98
+Martinez L.;A;Inter;83
+Goncalo Ramos;A;Milan;79
+Hojlund;A;Napoli;77
+Kolo Muani;A;Juventus;71
+Thuram;A;Inter;71
+Douvikas;A;Como;70
+Yildiz;A;Juventus;67
+Kean;A;Como;62
+Davis;A;Udinese;59
+Scamacca;A;Atalanta;58
+Krstovic;A;Atalanta;57
+Soule;A;Roma;57
+Woltemade;A;Juventus;57
+Castro;A;Roma;54
+Dybala;A;Roma;54
+Simeone;A;Torino;54
+Che Adams;A;Torino;52
+Pinamonti;A;Lazio;52
+Berardi;A;Sassuolo;51
+Esposito Pio;A;Inter;45
+Lauriente;A;Sassuolo;45
+Pellegrino;A;Fiorentina;44
+Raspadori;A;Atalanta;43
+Zapata;A;Torino;42
+Neres;A;Napoli;41
+Beto;A;Fiorentina;40
+Esposito S.;A;Sassuolo;39
+Rowe;A;Atalanta;39
+De Ketelaere;A;Atalanta;38
+Rodriguez J.;A;Como;38
+Boga;A;Juventus;34
+Colombo;A;Genoa;34
+Lang;A;Napoli;34
+Alajbegovic;A;Juventus;32
+Diao;A;Como;32
+Bonny;A;Inter;31
+Raimondo;A;Frosinone;30
+Vitinha;A;Genoa;30
+Cambiaghi;A;Bologna;29
+Gnonto;A;Fiorentina;29
+Lucca;A;Napoli;28
+Stulic;A;Lecce;27
+Isaksen;A;Lazio;26
+Piccoli;A;Bologna;26
+Bowie;A;Sassuolo;25
+Borrelli;A;Cagliari;24
+Cutrone;A;Monza;24
+Ghedjemis;A;Frosinone;24
+Giovane;A;Napoli;24
+Yeboah;A;Venezia;24
+Adorante;A;Venezia;23
+Gonzalez N.;A;Juventus;23
+Noslin;A;Lazio;23
+Elphege;A;Parma;22
+Sulemana K.;A;Atalanta;22
+Varela;A;Monza;22
+Bobcek;A;Frosinone;21
+Kvernadze;A;Frosinone;21
+Njie;A;Fiorentina;21
+Havel;A;Genoa;20
+Addai;A;Como;19
+Cancellieri;A;Lazio;19
+Dovbyk;A;Bologna;19
+Ekhator;A;Juventus;19
+Mota;A;Monza;19
+Nzola;A;Cagliari;19
+Romero D.;A;Parma;19
+Dominguez B.;A;Sassuolo;18
+Aboukhlal;A;Torino;17
+Adams A.;A;Venezia;17
+Birligea;A;Frosinone;17
+Kulenovic;A;Torino;17
+NDri;A;Lecce;17
+Ngonge;A;Monza;17
+Almqvist;A;Parma;15
+Geubbels;A;Lecce;15
+Gueye;A;Udinese;14
+Osmajic;A;Genoa;14
+Toure E.;A;Parma;14
+Bayo;A;Udinese;13
+Baldé K.;A;Monza;12
+Enem;A;Bologna;12
+Kevin Carlos;A;Cagliari;12
+Zeballos;A;Monza;12
+Camarda;A;Milan;10
+Fatah;A;Lecce;10
+Felici;A;Cagliari;10
+Fini;A;Frosinone;10
+Frigan;A;Parma;10
+Lisman;A;Venezia;10
+Milik;A;Juventus;10
+Rrahmani A.;A;Venezia;10
+Karlsson;A;Bologna;9
+Robinson J.;A;Monza;9
+Robinho Jr.;A;Genoa;8
+Lauberbach;A;Venezia;6
+Mendy;A;Cagliari;6
+Pellegri;A;Torino;6
+De Martis T.;A;Parma;4
+Trepy;A;Cagliari;4
+Arena A.;A;Roma;3
+Diallo O.;A;Parma;3
+Forson;A;Monza;3
+Martins;A;Monza;3
+Skjellerup;A;Sassuolo;3
+Cichero;A;Frosinone;2
+Lontani;A;Parma;2
+Pierini;A;Sassuolo;2
+Balentien C.;A;Milan;1
+Croci;A;Fiorentina;1
+Jovic M.;A;Lecce;1
+Kulla;A;Sassuolo;1
+Laerke;A;Lecce;1
+Lavelli M.;A;Inter;1
+Mosconi M.;A;Inter;1
+Nuredini;A;Genoa;1
+Toure M.;A;Venezia;1
+Vinciati;A;Udinese;1
+Zulevic;A;Genoa;1
+Calhanoglu;C;Inter;65
+Mctominay;C;Napoli;57
+Paz;C;Como;57
+Pulisic;C;Milan;55
+Orsolini;C;Bologna;51
+Rabiot;C;Milan;50
+Vlasic;C;Torino;50
+De Bruyne;C;Napoli;48
+Zaniolo;C;Udinese;48
+Baturina;C;Como;47
+Da Cunha;C;Como;45
+Santos;C;Napoli;45
+Pellegrini Lo.;C;Roma;44
+Barella;C;Inter;42
+Conceicao;C;Juventus;42
+Modric;C;Milan;42
+Bernardeschi;C;Bologna;41
+Kone M.;C;Roma;41
+Mckennie;C;Juventus;41
+Zielinski;C;Inter;41
+Zaccagni;C;Lazio;40
+Saelemaekers;C;Milan;39
+Gudmundsson;C;Lazio;38
+Jones;C;Inter;38
+Thorstvedt;C;Sassuolo;38
+Atta;C;Fiorentina;36
+Ederson;C;Atalanta;36
+Goncalves;C;Fiorentina;35
+Politano;C;Napoli;35
+Taylor;C;Lazio;35
+Caqueret;C;Como;34
+Locatelli;C;Juventus;34
+Moreira;C;Milan;34
+Perrone;C;Como;34
+Thuram K.;C;Juventus;34
+Cristante;C;Roma;33
+Ekkelenkamp;C;Udinese;33
+Mastantuono;C;Fiorentina;33
+Mkhitaryan;C;Inter;32
+Anguissa;C;Napoli;31
+Kessie;C;Atalanta;31
+Kone I.;C;Sassuolo;31
+Pisilli;C;Roma;31
+Samardzic;C;Atalanta;31
+Sarr Pape M.;C;Juventus;31
+Chukwueze;C;Milan;30
+Fagioli;C;Fiorentina;30
+Frattesi;C;Lazio;30
+Mandragora;C;Torino;30
+Mora R.;C;Roma;30
+Koopmeiners;C;Juventus;29
+Loftus Cheek;C;Milan;29
+Pasalic;C;Atalanta;29
+Bernabe;C;Parma;28
+Volpato;C;Sassuolo;28
+Casadei;C;Torino;27
+Lobotka;C;Napoli;27
+Sucic;C;Inter;27
+Vergara;C;Napoli;27
+De Roon;C;Roma;26
+Hutchinson;C;Milan;26
+Luis Henrique;C;Inter;25
+Messias;C;Genoa;25
+Odgaard;C;Bologna;25
+Zalewski;C;Atalanta;25
+Calo;C;Frosinone;24
+Elmas;C;Atalanta;24
+Pierotti;C;Lecce;24
+Gineitis;C;Torino;23
+Karlstrom;C;Udinese;23
+Matic;C;Sassuolo;23
+Mbangula;C;Bologna;23
+Piotrowski;C;Udinese;23
+Ricci;C;Como;23
+Braganca;C;Torino;22
+Douglas Luiz;C;Juventus;22
+Berisha;C;Lecce;21
+Cataldi;C;Lazio;21
+Diouf;C;Inter;21
+Fadera;C;Cagliari;21
+Ferguson;C;Bologna;21
+Frendrup;C;Genoa;21
+Gaetano;C;Atalanta;21
+Milla;C;Como;21
+Adopo;C;Cagliari;20
+Baldanzi;C;Genoa;20
+Brescianini;C;Fiorentina;20
+Colpani;C;Monza;20
+Fabbian;C;Parma;20
+Keita;C;Parma;20
+Maldini;C;Cagliari;20
+Pobega;C;Bologna;20
+Zhegrova;C;Juventus;20
+Gandelman;C;Lecce;19
+Liberali;C;Como;19
+Monteiro;C;Lecce;19
+Moro;C;Bologna;19
+Pessina;C;Monza;19
+Schmid R.;C;Frosinone;19
+Basic;C;Venezia;18
+Coulibaly L.;C;Lecce;18
+Oulai;C;Fiorentina;18
+Sow;C;Genoa;18
+Stankovic A.;C;Inter;18
+Dele Bashiru;C;Lazio;17
+Ellertsson;C;Genoa;17
+Fazzini;C;Cagliari;17
+Ilkhan;C;Torino;17
+Masini;C;Frosinone;17
+Perez K.;C;Venezia;17
+Sohm;C;Venezia;17
+Unai Gomez;C;Udinese;17
+Busio;C;Venezia;16
+Folorunsho;C;Monza;16
+Jashari;C;Milan;16
+Lipani;C;Sassuolo;16
+Nicolussi;C;Parma;16
+Rovella;C;Lazio;16
+Belahyane;C;Lazio;15
+Cichella;C;Frosinone;15
+Hainaut;C;Venezia;15
+Miller;C;Udinese;15
+Musah;C;Milan;15
+NDour;C;Fiorentina;15
+Ordonez;C;Parma;15
+Oristanio;C;Torino;15
+Venturino;C;Genoa;15
+Ciervo;C;Cagliari;14
+Fernandez T.;C;Venezia;14
+Grillitsch;C;Frosinone;14
+Ilic;C;Lecce;14
+Toure I.;C;Monza;14
+Traore;C;Genoa;14
+Winks;C;Cagliari;14
+Chakvetadze;C;Udinese;13
+Deiola;C;Cagliari;13
+Meichtry;C;Genoa;13
+Romano A.;C;Cagliari;13
+Sottil;C;Fiorentina;13
+Sulemana I.;C;Sassuolo;13
+Zarraga;C;Udinese;13
+Zerbin;C;Frosinone;13
+Adzic;C;Sassuolo;12
+Bondo;C;Milan;12
+El Shaarawy S.;C;Genoa;12
+Fitz-Jim;C;Torino;12
+Amondarain;C;Bologna;11
+Amorim;C;Genoa;11
+Anjorin;C;Torino;11
+Bakola;C;Sassuolo;11
+Ciurria;C;Monza;11
+Colombo L.;C;Monza;11
+Cremaschi;C;Parma;11
+Gagliardini R.;C;Cagliari;11
+Duncan;C;Venezia;10
+Gelli F.;C;Frosinone;10
+Helgason;C;Venezia;10
+Lovric;C;Udinese;10
+Maleh;C;Lecce;10
+Akinsanmiro;C;Monza;9
+Gilmour;C;Napoli;9
+Kone B.;C;Frosinone;9
+Cisse A.;C;Milan;8
+Jovanovic;C;Udinese;8
+Ngom;C;Lecce;8
+Boloca;C;Sassuolo;7
+El Azzouzi O.;C;Bologna;7
+Przyborek;C;Lazio;7
+Dagasso;C;Venezia;6
+Hasa;C;Frosinone;6
+Kaba;C;Lecce;6
+Ondoa;C;Monza;6
+Sierro V.;C;Parma;6
+Gorter;C;Lecce;5
+Lafont G.;C;Genoa;5
+Akarakiri;C;Cagliari;4
+Cacciamani;C;Torino;4
+Fofana S.;C;Lecce;4
+Konate A.S.;C;Parma;4
+Liteta;C;Cagliari;4
+Massolin;C;Cagliari;4
+Wiafe;C;Genoa;4
+Mout;C;Monza;3
+Cinquegrano;C;Sassuolo;2
+Ghion;C;Sassuolo;2
+Lahdo;C;Como;2
+Ballabio;C;Monza;1
+Berardi L.;C;Venezia;1
+Cassano R.;C;Como;1
+Comotto;C;Milan;1
+El Haddad;C;Venezia;1
+Fanne;C;Venezia;1
+Farcomeni;C;Lazio;1
+Grandu;C;Cagliari;1
+Kovac;C;Lecce;1
+Luongo;C;Torino;1
+Manzoni A.;C;Atalanta;1
+Panada;C;Venezia;1
+Pejicic;C;Udinese;1
+Svilar;P;Roma;40
+Carnesecchi;P;Atalanta;35
+Maignan;P;Milan;34
+Vicario;P;Juventus;32
+Butez;P;Como;31
+Mandas;P;Lazio;29
+Martinez J.;P;Inter;29
+Milinkovic;P;Napoli;28
+Perri;P;Torino;22
+Skorupski;P;Bologna;22
+Caprile;P;Cagliari;21
+Bijlow;P;Genoa;17
+Paleari;P;Torino;17
+Okoye;P;Udinese;16
+De Gea;P;Fiorentina;15
+Falcone;P;Lecce;15
+Meret;P;Napoli;15
+Muric;P;Sassuolo;15
+Palmisani;P;Frosinone;14
+Stankovic F.;P;Venezia;11
+Thiam D.;P;Monza;7
+Bleve;P;Lecce;1
+Christensen;P;Fiorentina;1
+Contini;P;Napoli;1
+Corvi;P;Parma;1
+Daffara;P;Parma;1
+De Marzi;P;Roma;1
+Desplanches;P;Frosinone;1
+Di Gennaro;P;Inter;1
+Furlanetto;P;Lazio;1
+Ghidotti;P;Parma;1
+Gollini;P;Roma;1
+Grabara;P;Juventus;1
+Grandi;P;Venezia;1
+Happonen;P;Bologna;1
+Israel;P;Torino;1
+Lezzerini;P;Fiorentina;1
+Lolic;P;Frosinone;1
+Mascardi;P;Torino;1
+Mazzocchi A.;P;Parma;1
+Montipo;P;Venezia;1
+Motta;P;Lazio;1
+Mrozek;P;Udinese;1
+Padelli;P;Udinese;1
+Pardel P.;P;Atalanta;1
+Penev;P;Lecce;1
+Pessina M.;P;Bologna;1
+Piana;P;Udinese;1
+Pinsoglio;P;Juventus;1
+Pisseri;P;Frosinone;1
+Pittarella M.;P;Milan;1
+Pompei;P;Atalanta;1
+Pozzi;P;Venezia;1
+Provedel;P;Inter;1
+Radu R.;P;Juventus;1
+Radunovic;P;Cagliari;1
+Renzetti;P;Lazio;1
+Rossi F.;P;Atalanta;1
+Sanchez R.;P;Como;1
+Satalino;P;Sassuolo;1
+Sherri;P;Cagliari;1
+Siviero;P;Torino;1
+Sommariva;P;Genoa;1
+Sportiello;P;Atalanta;1
+Stolz;P;Genoa;1
+Strajnar;P;Monza;1
+Terracciano;P;Milan;1
+Tornqvist;P;Monza;1
+Torriani;P;Milan;1
+Turati;P;Sassuolo;1
+Vasquez D.;P;Roma;1
+Vigorito;P;Como;1
+Dimarco;D;Inter;42
+Bremer;D;Juventus;37
+Wesley;D;Roma;37
+Mancini;D;Roma;36
+Bastoni A.;D;Inter;34
+Pavlovic;D;Milan;34
+Bisseck;D;Inter;32
+Zappacosta;D;Atalanta;32
+Di Lorenzo;D;Napoli;31
+Kalulu;D;Juventus;31
+Ndicka;D;Roma;31
+Solet;D;Udinese;31
+Akanji;D;Inter;30
+Stones;D;Inter;30
+Molina N.;D;Roma;29
+Cambiaso;D;Juventus;27
+Chalobah;D;Como;27
+Kempf;D;Como;27
+Scalvini;D;Atalanta;27
+Spinazzola;D;Napoli;27
+Valle;D;Como;27
+Dodo;D;Fiorentina;26
+Spence;D;Inter;26
+Hermoso;D;Roma;25
+Ramon;D;Como;25
+Rrahmani;D;Napoli;25
+Bellanova;D;Atalanta;24
+Hien;D;Atalanta;24
+Kamara;D;Udinese;24
+Kelly;D;Juventus;24
+Carlos Augusto;D;Inter;23
+Comuzzo;D;Torino;23
+Gila;D;Milan;23
+Miranda J.;D;Bologna;23
+Balerdi;D;Roma;22
+Ostigard;D;Genoa;22
+Gabbia;D;Milan;21
+Gabriel;D;Lecce;21
+Holm;D;Bologna;21
+Pavard;D;Inter;21
+Bartesaghi;D;Milan;20
+Belghali;D;Torino;20
+Buongiorno;D;Napoli;20
+Couto;D;Como;20
+Gallo;D;Lecce;20
+Lucumi;D;Juventus;20
+Marusic;D;Lazio;20
+Valeri;D;Parma;20
+Vasquez;D;Genoa;20
+Badiashile;D;Napoli;19
+Bernasconi;D;Atalanta;19
+Celik;D;Juventus;19
+Doekhi;D;Lazio;19
+Ismajli;D;Torino;19
+Jimenez;D;Fiorentina;19
+Mina;D;Cagliari;19
+Parisi;D;Fiorentina;19
+Sugawara;D;Cagliari;19
+Tavares;D;Lazio;19
+Theate;D;Bologna;19
+Tomori;D;Milan;19
+Delprato;D;Parma;18
+Gatti;D;Juventus;18
+Kristensen T.;D;Atalanta;18
+Pedraza;D;Lazio;18
+Smolcic;D;Como;18
+Sutalo;D;Lazio;18
+Zortea;D;Bologna;18
+Diego Carlos;D;Parma;17
+Ghilardi;D;Roma;17
+Obrador;D;Sassuolo;17
+Ranieri;D;Fiorentina;17
+Rensch;D;Roma;17
+Vojvoda;D;Udinese;17
+Beukema;D;Napoli;16
+Caleta-Car;D;Sassuolo;16
+Coco;D;Torino;16
+De Winter;D;Milan;16
+Dragusin;D;Fiorentina;16
+Kambwala;D;Como;16
+Kossounou;D;Atalanta;16
+Obert;D;Cagliari;16
+Olivera;D;Napoli;16
+Pongracic;D;Fiorentina;16
+Provstgaard;D;Lazio;16
+Terzic;D;Frosinone;16
+Valdepenas;D;Fiorentina;16
+Aurelio;D;Cagliari;15
+Kabasele;D;Udinese;15
+Koulierakis;D;Roma;15
+Patterson;D;Torino;15
+Veiga D.;D;Lecce;15
+Cabal;D;Juventus;14
+Drameh;D;Genoa;14
+Ehizibue K.;D;Genoa;14
+Haps;D;Venezia;14
+Juan Jesus;D;Venezia;14
+Kaiki;D;Como;14
+Marcandalli;D;Genoa;14
+Oyono A.;D;Frosinone;14
+Rodriguez Ju.;D;Cagliari;14
+Troilo;D;Parma;14
+Walukiewicz;D;Sassuolo;14
+Ze Pedro;D;Cagliari;14
+Bracaglia;D;Frosinone;13
+Calvani;D;Frosinone;13
+Correia;D;Venezia;13
+Favasuli;D;Napoli;13
+Kolasinac;D;Atalanta;13
+Mangas;D;Monza;13
+Monterisi;D;Frosinone;13
+Sabelli;D;Genoa;13
+Van der Brempt;D;Sassuolo;13
+Viery;D;Fiorentina;13
+Vitik;D;Bologna;13
+Bertola;D;Udinese;12
+Birindelli;D;Monza;12
+Heggem;D;Bologna;12
+Joao Mario;D;Fiorentina;12
+Lazzari;D;Lazio;12
+Marin R.;D;Napoli;12
+Carboni A.;D;Monza;11
+Doig;D;Sassuolo;11
+Fortini;D;Torino;11
+Patric;D;Lazio;11
+Alhassane;D;Bologna;10
+Idrissi;D;Cagliari;10
+Leysen;D;Sassuolo;10
+Marianucci;D;Napoli;10
+Pellegrini Lu.;D;Lazio;10
+Rodriguez R.;D;Torino;10
+Siebert;D;Lecce;10
+Bella Kotchap;D;Venezia;9
+Britschgi;D;Parma;9
+Comert;D;Torino;9
+Estupinan;D;Milan;9
+Floriani;D;Lazio;9
+Franjic;D;Venezia;9
+Goglichidze;D;Monza;9
+Halhal;D;Venezia;9
+Schingtienne;D;Venezia;9
+Sverko;D;Venezia;9
+Terracciano F.;D;Milan;9
+Valenti;D;Parma;9
+Akpoguma;D;Frosinone;8
+Biraghi;D;Torino;8
+Cande;D;Sassuolo;8
+Cittadini;D;Frosinone;8
+Dossena;D;Como;8
+Goldaniga;D;Como;8
+Helland;D;Bologna;8
+Moreno M.;D;Venezia;8
+Ndiaye;D;Parma;8
+Odenthal;D;Sassuolo;8
+Puczka;D;Genoa;8
+Sagrado;D;Venezia;8
+Tchato;D;Frosinone;8
+Zanoli;D;Udinese;8
+Ziolkowski;D;Monza;8
+Ebosse;D;Udinese;7
+Gaspar;D;Lecce;7
+Idzes;D;Sassuolo;7
+Lulli;D;Roma;7
+Mitaj;D;Genoa;7
+Carboni F.;D;Parma;6
+Casale;D;Bologna;6
+Jean;D;Lecce;6
+Mazzocchi;D;Venezia;6
+Otoa;D;Genoa;6
+Pieragnolo;D;Sassuolo;6
+Amey;D;Frosinone;5
+Arizala;D;Udinese;5
+De Silvestri;D;Bologna;5
+Diawara S.;D;Milan;5
+Drobnic;D;Parma;5
+El Azzouzi A.;D;Frosinone;5
+Fayed;D;Frosinone;5
+Gomes A.;D;Venezia;5
+Kofler;D;Cagliari;5
+Kouadio;D;Monza;5
+Lucchesi;D;Monza;5
+Mohammed;D;Venezia;5
+Palma;D;Udinese;5
+Ndaba;D;Lecce;4
+Rugani;D;Juventus;4
+Abankwah;D;Udinese;3
+Antov;D;Monza;3
+Dembele;D;Lecce;3
+Salah Eddine;D;Roma;3
+Bakoune;D;Monza;2
+Maye;D;Monza;2
+Bovio;D;Inter;1
+De Paoli C.;D;Como;1
+Galassi;D;Lazio;1
+Junior Ligue;D;Venezia;1
+Marcelo Vaz;D;Genoa;1
+Obric;D;Atalanta;1
+Paz Y.;D;Sassuolo;1
+Ubani;D;Lecce;1
+Vladimirov V.;D;Milan;1

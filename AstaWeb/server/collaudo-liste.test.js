@@ -1,8 +1,9 @@
 /**
- * Collaudo dei file lista generati dal listone ufficiale 2026/27:
+ * Collaudo del LISTONE UFFICIALE 2026 fornitO da Giovanni (07/09/2026,
+ * Downloads\Fanta Opus\data\listone_2026_asta.csv — nome;ruolo;squadra;base):
  * 1) parser Node (lo stesso codice del server AstaWeb) su .xlsx e .csv
  * 2) integrazione server: upload della .xlsx via API, avvio asta con 8 partecipanti,
- *    verifica ordine coda (primo = miglior attaccante) e statistiche iniziali.
+ *    verifica ordine coda (primo = Malen, quota più alta) e statistiche iniziali.
  */
 "use strict";
 
@@ -13,11 +14,11 @@ const { ParserLista, creaServer } = require("../server/asta-server.js");
 const http = require("node:http");
 
 const DIR_LISTE = path.join(__dirname, "..", "liste");
-const XLSX = path.join(DIR_LISTE, "lista-seriea-2026-27.xlsx");
-const CSV = path.join(DIR_LISTE, "lista-seriea-2026-27.csv");
+const XLSX = path.join(DIR_LISTE, "listone_2026_asta.xlsx");
+const CSV = path.join(DIR_LISTE, "listone_2026_asta.csv");
 
-const ATTESI = { P: 28, D: 72, C: 72, A: 56 };
-const TOTALE = 228;
+const ATTESI = { P: 72, D: 200, C: 199, A: 120 };
+const TOTALE = 591;
 
 // ---------------------------------------------------------------- parser
 function verifica(esito, etichetta) {
@@ -28,18 +29,18 @@ function verifica(esito, etichetta) {
     assert.strictEqual(n, ATTESI[r], etichetta + ": reparto " + r);
   }
   assert.deepStrictEqual(esito.avvisi, [], etichetta + ": avvisi " + JSON.stringify(esito.avvisi));
+  // TUTTI con la squadra di appartenenza (colonna obbligatoria di questo listone)
+  assert.strictEqual(esito.giocatori.filter((g) => g.squadra).length, TOTALE, etichetta + ": squadra su tutti");
   const perNome = Object.fromEntries(esito.giocatori.map((g) => [g.nome, g]));
-  assert.strictEqual(perNome["Martinez L."].quotazioneBase, 35, etichetta + ": Lautaro 35");
-  assert.strictEqual(perNome["Malen"].quotazioneBase, 34, etichetta + ": Malen 34");
-  assert.strictEqual(perNome["Dimarco"].quotazioneBase, 32, etichetta + ": Dimarco 32");
-  assert.strictEqual(perNome["Paz N."].quotazioneBase, 30, etichetta + ": Nico Paz 30");
+  assert.strictEqual(perNome["Malen"].quotazioneBase, 98, etichetta + ": Malen 98");
+  assert.strictEqual(perNome["Malen"].squadra, "Roma", etichetta + ": Malen Roma");
+  assert.strictEqual(perNome["Martinez L."].quotazioneBase, 83, etichetta + ": Lautaro 83");
+  assert.strictEqual(perNome["Martinez L."].squadra, "Inter", etichetta + ": Lautaro Inter");
+  assert.strictEqual(perNome["Dimarco"].quotazioneBase, 42, etichetta + ": Dimarco 42");
+  assert.strictEqual(perNome["Calhanoglu"].quotazioneBase, 65, etichetta + ": Calhanoglu 65");
   assert.strictEqual(perNome["Svilar"].ruolo, "P", etichetta + ": Svilar P");
-  assert.strictEqual(perNome["Martinez Jo."].ruolo, "P", etichetta + ": Josep Martinez P");
+  assert.strictEqual(perNome["Svilar"].quotazioneBase, 40, etichetta + ": Svilar 40");
   assert.strictEqual(perNome["Martinez L."].ruolo, "A", etichetta + ": Lautaro A");
-  // gli 8 nomi con caratteri non-ASCII della selezione transitano intatti
-  for (const nome of ["Dodò", "Lucumì", "Konè M.", "Konè I.", "Bernabè", "Calò", "Laurientè", "Soulè"]) {
-    assert.ok(perNome[nome], etichetta + ": manca " + nome);
-  }
   console.log("OK parser", etichetta, "-", TOTALE, "giocatori", JSON.stringify(ATTESI));
 }
 
@@ -83,7 +84,7 @@ function primaVistaSse(porta, query) {
       const r = await chiama(porta, "/api/entra", "POST", JSON.stringify({ nome: "Fante" + i }), { "Content-Type": "application/json" });
       assert.strictEqual(r.stato, 200);
     }
-    const rLista = await chiama(porta, "/api/lista", "POST", fs.readFileSync(XLSX), { "x-pin": pin, "x-nome-file": "lista-seriea-2026-27.xlsx", "Content-Type": "application/octet-stream" });
+    const rLista = await chiama(porta, "/api/lista", "POST", fs.readFileSync(XLSX), { "x-pin": pin, "x-nome-file": "listone_2026_asta.xlsx", "Content-Type": "application/octet-stream" });
     assert.strictEqual(rLista.stato, 200, "upload lista: " + rLista.testo);
     assert.strictEqual(rLista.j.esito.giocatori, TOTALE);
     assert.deepStrictEqual(rLista.j.esito.perRuolo, ATTESI, "perRuolo via API");
@@ -93,11 +94,12 @@ function primaVistaSse(porta, query) {
     assert.strictEqual((await chiama(porta, "/api/avvia", "POST", JSON.stringify({ pin }), { "Content-Type": "application/json" })).stato, 200);
     const vb = await primaVistaSse(porta, "pin=" + pin);
     assert.strictEqual(vb.fase, "ATTESA_OFFERTE");
-    assert.strictEqual(vb.giocatore.nome, "Martinez L.", "primo all'asta = miglior attaccante (ordine A→C→P→D)");
-    assert.strictEqual(vb.giocatore.quotazioneBase, 35);
-    assert.deepStrictEqual(vb.statistiche.A, { totale: 56, venduti: 0, svincolati: 0, inCoda: 55 });
+    assert.strictEqual(vb.giocatore.nome, "Malen", "primo all'asta = quota più alta (ordine A→C→P→D)");
+    assert.strictEqual(vb.giocatore.quotazioneBase, 98);
+    assert.strictEqual(vb.giocatore.squadra, "Roma");
+    assert.deepStrictEqual(vb.statistiche.A, { totale: 120, venduti: 0, svincolati: 0, inCoda: 119 });
     assert.strictEqual(vb.codaRimanente, TOTALE - 1);
-    console.log("OK server: asta avviata, primo giocatore", vb.giocatore.nome, vb.giocatore.quotazioneBase, "FMM, coda", vb.codaRimanente);
+    console.log("OK server: asta avviata, primo giocatore", vb.giocatore.nome, vb.giocatore.squadra, vb.giocatore.quotazioneBase, "FMM, coda", vb.codaRimanente);
     console.log("\n=== COLLAUDO LISTE UFFICIALI SUPERATO ===");
   } finally {
     if (server.closeAllConnections) server.closeAllConnections();
