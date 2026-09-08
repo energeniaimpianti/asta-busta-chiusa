@@ -308,6 +308,23 @@ test("voce: con spareggio NON si ripete l'asta iniziale — si racconta SOLO l'u
     assert.ok(ann.includes("Pareggio insuperabile!"), "manca il pareggio insuperabile: " + ann);
     assert.ok(ann.includes("44"), "importo di spareggio non letto: " + ann);
   }
+  // a TRE o più candidati non è una monetina: la voce dice PESCA/SORTEGGIO
+  const r3 = riv({
+    offerteInOrdine: [off("Dario", 50), off("Franco", 50), off("Elba", 50)],
+    vincitore: "Franco", importoFinale: 50, spareggi: 1,
+    spareggio: [off("Dario", 50), off("Franco", 50), off("Elba", 50)],
+    sorteggiato: true,
+  });
+  for (let seme = 1; seme <= 60; seme++) {
+    const ann = generaAnnuncio(r3, rngConSeme(seme));
+    assert.ok(ann.includes("Si sorteggia"), "con 3+ candidati si sorteggia: " + ann);
+    assert.ok(!ann.includes("monetina") && !ann.includes("testa o croce"), "niente monetina con 3+: " + ann);
+  }
+  // a DUE resta la monetina
+  for (let seme = 1; seme <= 60; seme++) {
+    const ann = generaAnnuncio(rs, rngConSeme(seme));
+    assert.ok(ann.includes("Si lancia la monetina"), "con 2 candidati si lancia la monetina: " + ann);
+  }
 });
 
 // ------------------------------------------------------------ anti-ripetizione e determinismo

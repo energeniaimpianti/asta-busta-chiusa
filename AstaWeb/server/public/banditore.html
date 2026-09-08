@@ -634,10 +634,11 @@ function applicaVis() {
     if (r.nonVenduto) {
       esito.innerHTML = `<div class="nonvenduto">❌ Non venduto (${esc(r.motivoNonVenduto)})</div>`;
     } else if (r.sorteggiato) {
-      // MONETINA: il lancio si vede prima del verdetto, come lo racconta la voce
-      esito.innerHTML = `<div class="monetina-gira">🪙</div><div class="muto centro">si lancia la monetina…</div>`;
+      // MONETINA (2 candidati) o PESCA (3+): il lancio si vede prima del verdetto
+      const trePiu = (r.spareggio || []).length >= 3;
+      esito.innerHTML = `<div class="monetina-gira">${trePiu ? "🎲" : "🪙"}</div><div class="muto centro">${trePiu ? "si sorteggia…" : "si lancia la monetina…"}</div>`;
       setTimeout(() => {
-        esito.innerHTML = `<div class="vincitore" style="animation:vittoria 1.4s ease;">🪙🏆 ${esc(r.giocatore.nome)} → ${esc(r.vincitore)} per ${r.importoFinale} FMM</div><div class="muto centro">deciso dalla monetina</div>${r.passi.length ? `<div class="muto centro">Passo: ${r.passi.map(esc).join(", ")}</div>` : ""}`;
+        esito.innerHTML = `<div class="vincitore" style="animation:vittoria 1.4s ease;">${trePiu ? "🎲" : "🪙"}🏆 ${esc(r.giocatore.nome)} → ${esc(r.vincitore)} per ${r.importoFinale} FMM</div><div class="muto centro">${trePiu ? "deciso dal sorteggio" : "deciso dalla monetina"}</div>${r.passi.length ? `<div class="muto centro">Passo: ${r.passi.map(esc).join(", ")}</div>` : ""}`;
       }, 2800);
     } else if (r.importoFinale >= 25) {
       // PREMIO ALTO: 2 secondi di suspense prima del vincitore

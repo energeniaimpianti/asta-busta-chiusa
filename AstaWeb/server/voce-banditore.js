@@ -258,9 +258,18 @@ function generaSorteggio(r, rng) {
   }
   if (r.importoFinale >= 25) t += _pick(SUSPENSE, "su", rnd) + " ";
   t += `Pareggio insuperabile! ${g}... `;
-  // il lancio della monetina si RACCONTA: ellissi = pause reali nel TTS
-  t += "Si lancia la monetina... e... ";
-  t += _tmpl(_pick([
+  // il lancio si RACCONTA (ellissi = pause reali nel TTS); con 3+ candidati
+  // non è una monetina: è una pesca, e la voce lo dice
+  const trePiu = (r.spareggio || []).length >= 3;
+  t += trePiu ? "Si sorteggia... e... " : "Si lancia la monetina... e... ";
+  t += _tmpl(_pick(trePiu ? [
+    "la pesca ha scelto {n}! {p} fantamilioni!",
+    "il destino ha scelto {n}! {p} fantamilioni!",
+    "la fortuna bacia {n}! {p}!",
+    "è toccata a {n}! Per {p}!",
+    "ha deciso la sorte, non il portafoglio: {n} per {p}!",
+    "il sorteggio ha parlato: {n}! {p} fantamilioni!",
+  ] : [
     "è caduta su {n}! {p} fantamilioni!",
     "il destino ha scelto {n}! {p} fantamilioni!",
     "la fortuna bacia {n}! {p}!",
