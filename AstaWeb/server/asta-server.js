@@ -207,10 +207,11 @@ class MotoreAsta {
     if (inSpareggio && !s.candidatiSpareggio.includes(pid)) return { ok: false, errore: "Non candidato allo spareggio" };
     if (!inSpareggio && !this.idonei().some((p) => p.id === pid)) return { ok: false, errore: "Partecipante non idoneo per questo reparto" };
     if (pid in s.offerte) return { ok: false, errore: "Offerta già registrata" };
-    // nello spareggio il minimo è la PROPRIA puntata del round principale:
-    // ripeterla è consentito (richiesta esplicita della lega), scendere no
+    // nello spareggio il minimo è la PROPRIA ultima puntata (del round principale al
+    // primo spareggio, del primo spareggio al secondo): ripeterla è consentito
+    // (massimo due giri, regola 08/09), scendere no
     const min = inSpareggio
-      ? (s.offerteRoundPrincipale[pid] || 1)
+      ? ((s.spareggi >= 2 ? s.ultimoSpareggio[pid] : s.offerteRoundPrincipale[pid]) || 1)
       : this.minOffertaCorrente();
     const max = this.maxOfferta(pid);
     const n = Number(importo);
@@ -235,8 +236,8 @@ class MotoreAsta {
     if (mancanti.length > 0) {
       for (const pid of mancanti) {
         if (s.fase === FASI.SPAREGGIO) {
-          // in spareggio i mancanti restano alla propria puntata del round principale (mai 0)
-          s.offerte[pid] = s.offerteRoundPrincipale[pid] || 1;
+          // in spareggio i mancanti restano alla propria ultima puntata (mai 0)
+          s.offerte[pid] = (s.spareggi >= 2 ? s.ultimoSpareggio[pid] : s.offerteRoundPrincipale[pid]) || 1;
         } else {
           s.offerte[pid] = 0; // nell'asta principale i mancanti fanno passo
         }
@@ -280,16 +281,27 @@ class MotoreAsta {
         s.spareggi = 1;
       }
     } else if (s.fase === FASI.SPAREGGIO) {
-      // SPAREGGIO UNICO (regola 07/09/2026): si può ripetere la propria puntata;
-      // qualunque pareggio qui decide la MONETINA (sorteggio automatico)
+      // SPAREGGI A DUE GIRI (regola definitiva 08/09): nel primo e nel secondo spareggio
+      // si può RIPETERE la propria puntata; se anche il secondo finisce in parità,
+      // solo allora la MONETINA assegna il giocatore
       const maxV = Math.max(...Object.values(s.offerte));
       const vincenti = Object.entries(s.offerte).filter(([, v]) => v === maxV).map(([k]) => Number(k));
       if (vincenti.length === 1) {
         this._aggiudica(g, vincenti[0], maxV, s.offerteRoundPrincipale, { ...s.offerte });
-      } else {
+      } else if (s.spareggi >= 2) {
         this._sorteggia(g, vincenti, maxV);
+      } else {
+        this._apriSpareggioSuccessivo(g, vincenti);
       }
     }
+  }
+
+  _apriSpareggioSuccessivo(g, idCandidati) {
+    const s = this.stato;
+    s.candidatiSpareggio = idCandidati;
+    s.ultimoSpareggio = { ...s.offerte };
+    s.offerte = {};
+    s.spareggi += 1;
   }
 
   _sorteggia(g, idCandidati, importo) {
@@ -974,7 +986,7 @@ function creaServer(opzioni = {}) {
         budgetResiduo: s.squadre[p.id].budgetResiduo,
         rosa: s.squadre[p.id].rosa.length,
       })),
-      spareggio: s.fase === "SPAREGGIO" ? { pari: sessione.motore._pariCorrente() } : null,
+      spareggio: s.fase === "SPAREGGIO" ? { pari: sessione.motore._pariCorrente(), giri: s.spareggi } : null,
       rivelazione: s.rivelazione,
       squadre: vistaSquadre(),
       tuttiCompleti: sessione.motore.tuttiCompleti,
@@ -1010,7 +1022,7 @@ function creaServer(opzioni = {}) {
           : [],
       daConsegnare: sessione.motore.interrogabili().filter((p) => p.id === pid).length > 0,
       spareggio: s.fase === "SPAREGGIO"
-        ? { pari: sessione.motore._pariCorrente(), min: s.offerteRoundPrincipale[pid] || 1, candidato: s.candidatiSpareggio.includes(pid) }
+        ? { pari: sessione.motore._pariCorrente(), min: (s.spareggi >= 2 ? s.ultimoSpareggio[pid] : s.offerteRoundPrincipale[pid]) || 1, candidato: s.candidatiSpareggio.includes(pid), giri: s.spareggi }
         : null,
       budgetResiduo: s.squadre[pid].budgetResiduo,
       rosaCount: s.squadre[pid].rosa.length,

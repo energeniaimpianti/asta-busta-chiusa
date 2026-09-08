@@ -535,7 +535,7 @@ function pannelloGiocatore() {
     <div class="giocatore-nome">${esc(g.nome)}</div>
     ${g.squadra ? `<div class="squadra-gioc">🛡 ${esc(g.squadra)}</div>` : ""}
     <div class="quot-min">Quotazione minima<b>${g.quotazioneBase}</b>FMM</div>
-    ${vista.spareggio ? `<div style="margin-top:6px"><b>⚖ Spareggio al pari di ${vista.spareggio.pari}</b> — ognuno dei pari può ripetere la propria puntata o salire: altro pareggio = monetina</div>` : ""}
+    ${vista.spareggio ? `<div style="margin-top:6px"><b>⚖ Spareggio al pari di ${vista.spareggio.pari}${(vista.spareggio.giri || 1) >= 2 ? " — SECONDO E ULTIMO GIRO" : ""}</b> — ognuno dei pari può ripetere la propria puntata o salire${(vista.spareggio.giri || 1) >= 2 ? ": un altro pareggio qui decide la monetina" : ""}</div>` : ""}
   </div>`;
 }
 

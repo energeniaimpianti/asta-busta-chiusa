@@ -252,10 +252,11 @@ const ok = (msg) => { CHECK++; console.log("OK " + msg); };
     ok("pareggio 20-20: spareggio aperto");
     await pagB.waitForFunction(() => document.body.innerText.includes("Spareggio"), { timeout: 8000 });
     await pagB.waitForFunction(() => document.body.innerText.includes("puoi"), { timeout: 8000 });
-    // nello spareggio il tasto 0 è DISABILITATO (non ci si ritira): offerte senza zeri
-    const zeroDisabilitato = await pagB.$eval('.pad button[data-t="0"]', (b) => b.disabled);
-    assert(zeroDisabilitato, "tasto 0 disabilitato nello spareggio");
-    assert(!(await pagB.$("#passo")), "bottone Passo assente nello spareggio");
+    // nello spareggio la tastiera resta COMPLETA: zero e Passo presenti come sempre
+    // (chi li preme riceve la spiegazione dal server, nessun tasto mutilato)
+    const zeroAttivo = await pagB.$eval('.pad button[data-t="0"]', (b) => !b.disabled);
+    assert(zeroAttivo, "tasto 0 ATTIVO anche nello spareggio (mai disattivato)");
+    assert(!!(await pagB.$("#passo")), "bottone Passo presente anche nello spareggio");
     await pagB.click('.pad button[data-t="3"]');
     await pagB.click('.pad button[data-t="2"]');
     await pagB.click("#consegna");

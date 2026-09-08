@@ -127,37 +127,43 @@ test("pareggio apre spareggio: no ritiro, min=propria offerta", () => {
   assert.strictEqual(m.stato.squadre[5].budgetResiduo, 475);
 });
 
-test("spareggio UNICO: ogni pareggio (stessa puntata o salita uguale) decide la MONETINA", () => {
+test("spareggio a DUE GIRI (regola 08/09): la stessa puntata si può ripetere due volte, poi la monetina", () => {
   const m = new MotoreAsta();
   m.avvia(cfgStd(), parts8(), listaStd());
   m.offri(1, 20); m.offri(2, 20);
   for (let i = 3; i <= 8; i++) m.offri(i, 0);
   assert.strictEqual(m.stato.fase, "SPAREGGIO");
+  assert.strictEqual(m.stato.spareggi, 1);
+  // PRIMO spareggio: ripetere la stessa puntata è consentito
+  m.offri(1, 20); m.offri(2, 20);
+  assert.strictEqual(m.stato.fase, "SPAREGGIO", "primo pareggio → SECONDO spareggio, non monetina");
+  assert.strictEqual(m.stato.spareggi, 2);
+  assert.strictEqual(m.corrente.nome, "Attaccante Uno");
+  // SECONDO spareggio: di nuovo si può ripetere; il minimo è la propria puntata del primo
+  assert.strictEqual(m.offri(1, 19).ok, false, "sotto la propria del primo spareggio: rifiutato");
+  assert.strictEqual(m.offri(1, 0).ok, false, "zero mai ammesso nello spareggio");
   m.offri(1, 20); m.offri(2, 20);
   const r = m.stato.rivelazione;
-  assert.strictEqual(m.stato.fase, "RIVELAZIONE");
+  assert.strictEqual(m.stato.fase, "RIVELAZIONE", "secondo pareggio → MONETINA");
   assert.strictEqual(r.sorteggiato, true);
   assert.strictEqual(r.importoFinale, 20);
   assert.ok(r.vincitore === "P1" || r.vincitore === "P2");
-  const vincitoreId = r.idVincitore;
-  assert.strictEqual(m.stato.squadre[vincitoreId].rosa.length, 1);
-  assert.strictEqual(m.stato.squadre[vincitoreId].budgetResiduo, 480);
   const t = testoAnnuncio(r);
   assert.ok(t.includes("sorteggiato"), "annuncio deve dire sorteggiato");
 });
 
-test("spareggio pareggiato SALENDO uguale (25-25 dopo 20-20): monetina subito, niente secondo spareggio", () => {
+test("spareggio: salita pari al primo giro apre il secondo; il secondo con vincitore aggiudica", () => {
   const m = new MotoreAsta();
   m.avvia(cfgStd(), parts8(), listaStd());
   m.offri(1, 20); m.offri(2, 20);
   for (let i = 3; i <= 8; i++) m.offri(i, 0);
-  m.offri(1, 25); m.offri(2, 25);
-  assert.strictEqual(m.stato.fase, "RIVELAZIONE", "pareggio nello spareggio deve sorteggiare subito");
-  assert.strictEqual(m.stato.spareggi, 1, "esiste UNO solo spareggio");
+  m.offri(1, 25); m.offri(2, 25);              // pari SALITI: apre il secondo giro
+  assert.strictEqual(m.stato.spareggi, 2);
+  m.offri(1, 30); m.offri(2, 28);              // secondo giro con vincitore
   const r = m.stato.rivelazione;
-  assert.strictEqual(r.sorteggiato, true);
-  assert.strictEqual(r.importoFinale, 25);
-  assert.ok(r.vincitore === "P1" || r.vincitore === "P2");
+  assert.strictEqual(r.vincitore, "P1");
+  assert.strictEqual(r.importoFinale, 30);
+  assert.strictEqual(r.sorteggiato, false);
 });
 
 test("annullaAssegnazione: QUALSIASI assegnazione, in qualsiasi momento", () => {
@@ -523,7 +529,7 @@ function astaCasuale(seme) {
         const max = m.maxOfferta(p.id);
         if (m.stato.fase === "SPAREGGIO") {
           // ammissibile sempre: la propria puntata (ripetuta → monetina) o una salita
-          const min = m.stato.offerteRoundPrincipale[p.id] || 1;
+          const min = (m.stato.spareggi >= 2 ? m.stato.ultimoSpareggio[p.id] : m.stato.offerteRoundPrincipale[p.id]) || 1;
           m.offri(p.id, rnd() < 0.5 ? min : Math.max(min, 1 + Math.floor(rnd() * max)));
         } else {
           const dado = Math.floor(rnd() * 10);
@@ -575,8 +581,8 @@ test("asta deterministica completa tutte le rose da 25 (8 partecipanti)", () => 
         if (m.stato.fase === "SPAREGGIO") {
           // nello spareggio 0 è rifiutato e il minimo è la PROPRIA puntata:
           // il primo candidato sale di 1, gli altri ripetono la propria
-          m.offri(ps[0].id, (m.stato.offerteRoundPrincipale[ps[0].id] || 1) + 1);
-          ps.slice(1).forEach((p) => m.offri(p.id, m.stato.offerteRoundPrincipale[p.id] || 1));
+          m.offri(ps[0].id, ((m.stato.spareggi >= 2 ? m.stato.ultimoSpareggio[ps[0].id] : m.stato.offerteRoundPrincipale[ps[0].id]) || 1) + 1);
+          ps.slice(1).forEach((p) => m.offri(p.id, (m.stato.spareggi >= 2 ? m.stato.ultimoSpareggio[p.id] : m.stato.offerteRoundPrincipale[p.id]) || 1));
         } else {
           m.offri(ps[0].id, 1);
           ps.slice(1).forEach((p) => m.offri(p.id, 0));
@@ -611,7 +617,7 @@ test("stress 12 partecipanti x 500 giocatori sotto 20 secondi", () => {
       else if (m.stato.fase === "SPAREGGIO") {
         // nello spareggio le offerte sotto la propria puntata sono rifiutate:
         // genera sempre valori ammissibili (ripetizione inclusa → monetina)
-        const min = m.stato.offerteRoundPrincipale[p.id] || 1;
+        const min = (m.stato.spareggi >= 2 ? m.stato.ultimoSpareggio[p.id] : m.stato.offerteRoundPrincipale[p.id]) || 1;
         m.offri(p.id, rnd() < 0.5 ? min : Math.max(min, 1 + Math.floor(rnd() * m.maxOfferta(p.id))));
       }
       else m.offri(p.id, rnd() < 1 / 3 ? 0 : 1 + Math.floor(rnd() * (m.maxOfferta(p.id) + 1)));

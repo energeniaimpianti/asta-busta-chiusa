@@ -281,10 +281,11 @@ function pannelloAsta() {
   </div>`;
 
   if (inSpareggio) {
+    const ultimoGiro = (vista.spareggio.giri || 1) >= 2;
     html += `<div class="card" style="background:#33290f">
-      <b>⚖ Spareggio${vista.spareggio.candidato ? "" : " (non ti riguarda)"}</b> al pari di ${vista.spareggio.pari} FMM.<br>
+      <b>⚖ Spareggio${vista.spareggio.candidato ? "" : " (non ti riguarda)"}${ultimoGiro ? " — secondo e ultimo giro" : ""}</b> al pari di ${vista.spareggio.pari} FMM.<br>
       <span class="muto">${vista.spareggio.candidato
-        ? "Consegna una nuova busta: puoi <b>ripetere i tuoi " + vista.spareggio.min + " FMM</b> o puntare più alto. Non ci si ritira, e un altro pareggio decide la monetina."
+        ? "Consegna una nuova busta: puoi <b>ripetere i tuoi " + vista.spareggio.min + " FMM</b> o puntare più alto. Non ci si ritira" + (ultimoGiro ? ": un altro pareggio qui decide la monetina." : ".")
         : "Aspetta l'esito: chi era in parità rilancia."}</span>
     </div>`;
   }
@@ -303,10 +304,10 @@ function pannelloAsta() {
         ? `min ${min} (puoi ripetere la tua puntata) · max ${vista.maxOfferta}`
         : `min ${vista.minOfferta} · max ${vista.maxOfferta} · 0 = passo`}</div>
       <div class="pad">${["1","2","3","4","5","6","7","8","9","0","⌫","C"].map((t) =>
-        `<button data-t="${t}" ${inSpareggio && t === "0" ? 'disabled style="opacity:.25"' : ""}>${t}</button>`).join("")}</div>
+        `<button data-t="${t}">${t}</button>`).join("")}</div>
       <div class="riga-buste">
-        ${inSpareggio ? "" : `<button class="btn btn-secondario" id="passo">Passo (0)</button>`}
-        <button class="btn" id="consegna" style="grid-column:${inSpareggio ? "1 / -1" : "auto"}">Consegna busta</button>
+        <button class="btn btn-secondario" id="passo">Passo (0)</button>
+        <button class="btn" id="consegna">Consegna busta</button>
       </div>
     </div>`;
   } else if (vista.mioStato === "PUNTATO") {
