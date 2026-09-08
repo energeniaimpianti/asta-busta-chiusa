@@ -28,7 +28,7 @@ Redatta il 26/08/2026 — versione 1.0. Ogni regola non dettata da Giovanni è r
 
 | # | Punto | Default | Motivo |
 |---|-------|---------|--------|
-| D1 | Budget iniziale | **500 FMM** | standard fantacalcio italiano |
+| D1 | Budget iniziale | **1500 FMM** per partecipante (regola definitiva della lega, 08/09) | scelta di Giovanni: più respiro sulle 25 rose da 6A/8C/3P/8D |
 | D2 | Pareggio sull'offerta massima | **SPAREGGIO AD OLTRANZA**: spareggi ristretti ai pari-merito, busta OBBLIGATORIA, minimo = **la propria ultima puntata** (ripeterla è consentito, scendere no), nessun ritiro. La **MONETINA** (sorteggio automatico; il vincitore paga l'importo pareggiato) arriva **solo dopo il secondo pareggio consecutivo CON LO STESSO importo**; se i pari alzano ogni volta (70-70, 71-71, 72-72…) **si continua finché uno vince o ripetono due volte lo stesso valore**. La tastiera dell'offerta non viene MAI mutilata: lo zero resta attivo anche nello spareggio e chi lo preme riceve la spiegazione dal server | regola definitiva della lega (08/09/2026 notte) |
 | D3 | Tutti passano (nessuna offerta > 0) | giocatore **non venduto**, reinserito in coda nel proprio reparto **una sola volta**, poi svincolato definitivo | evita loop infiniti a fine serata senza perdere nessuna occasione di acquisto |
 | D4 | Offerta massima consentita | **regola del resto ATTIVA**: `budget − (slot vuoti − 1)` | regola classica: garantisce ≥1 FMM per ogni posto ancora da riempire (le app USA la chiamano "max bid calculator", funzionalità molto richiesta) |

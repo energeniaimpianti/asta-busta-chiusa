@@ -32,7 +32,7 @@ const FASI = { ATTESA: "ATTESA_OFFERTE", SPAREGGIO: "SPAREGGIO", RIVELAZIONE: "R
 
 const CONFIG_DEFAULT = {
   nomeLega: "Lega dell'Asta",
-  budgetIniziale: 500,
+  budgetIniziale: 1500,
   quote: { P: 3, D: 8, C: 8, A: 6 },
   ordineRuoli: ["A", "C", "P", "D"],
   regolaResto: true,
@@ -61,6 +61,27 @@ function rngConSeed(seed) {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+/** Blocchi porta: per ogni portiere la finestra di 3 consecutivi della stessa squadra
+ *  (l'ordine della lista definitiva li mette in trii; finestra per multipli di 3 così
+ *  la regola vale anche con liste custom ordinate diversamente). */
+function _calcolaBlocchiPorta(lista) {
+  const out = {};
+  const perSq = new Map();
+  for (const g of lista) {
+    if (g.ruolo !== "P") continue;
+    if (!perSq.has(g.squadra)) perSq.set(g.squadra, []);
+    perSq.get(g.squadra).push(g);
+  }
+  for (const [sq, grup] of perSq) {
+    grup.sort((a, b) => (b.quotazioneBase - a.quotazioneBase) || a.nome.localeCompare(b.nome));
+    for (let i = 0; i < grup.length; i++) {
+      const inizio = Math.floor(i / 3) * 3;
+      out[grup[i].id] = grup.slice(inizio, inizio + 3).map((g) => g.nome);
+    }
+  }
+  return out;
 }
 
 class MotoreAsta {
@@ -108,6 +129,7 @@ class MotoreAsta {
       ripetizioniPareggio: 0, // quante volte CONSECUTIVE si è pareggiato con lo stesso importo
       storiaSpareggi: [],     // ogni giro di spareggio chiuso (pid -> importo), per lo schermo
       squadre,
+      blocchiPorta: _calcolaBlocchiPorta(this.stato ? lista : lista, cfg),
       nonVenduti: [],
       reinsertioni: {},
       rivelazione: null,
@@ -1000,7 +1022,7 @@ function creaServer(opzioni = {}) {
     return {
       ...base,
       preAvvio: false,
-      giocatore: g ? { nome: g.nome, ruolo: g.ruolo, quotazioneBase: g.quotazioneBase, squadra: g.squadra || "" } : null,
+      giocatore: g ? { nome: g.nome, ruolo: g.ruolo, quotazioneBase: g.quotazioneBase, squadra: g.squadra || "", bloccoPorta: g.ruolo === "P" ? (s.blocchiPorta && s.blocchiPorta[g.id]) || null : null } : null,
       banditore: true,
       partecipanti: s.partecipanti.map((p) => ({
         id: p.id, nome: p.nome,
@@ -1033,7 +1055,7 @@ function creaServer(opzioni = {}) {
     const out = {
       ...baseP,
       preAvvio: false,
-      giocatore: g ? { nome: g.nome, ruolo: g.ruolo, quotazioneBase: g.quotazioneBase, squadra: g.squadra || "" } : null,
+      giocatore: g ? { nome: g.nome, ruolo: g.ruolo, quotazioneBase: g.quotazioneBase, squadra: g.squadra || "", bloccoPorta: g.ruolo === "P" ? (s.blocchiPorta && s.blocchiPorta[g.id]) || null : null } : null,
       mioStato: sessione.motore.statoBid(pid),
       minOfferta: sessione.motore.minOffertaCorrente(),
       maxOfferta: sessione.motore.maxOfferta(pid),

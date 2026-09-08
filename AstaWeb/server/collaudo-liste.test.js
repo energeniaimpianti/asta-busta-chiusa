@@ -14,11 +14,11 @@ const { ParserLista, creaServer } = require("../server/asta-server.js");
 const http = require("node:http");
 
 const DIR_LISTE = path.join(__dirname, "..", "liste");
-const XLSX = path.join(DIR_LISTE, "listone_2026_asta.xlsx");
-const CSV = path.join(DIR_LISTE, "listone_2026_asta.csv");
+const XLSX = path.join(DIR_LISTE, "listone_2026-27_asta.xlsx");
+const CSV = path.join(DIR_LISTE, "listone_2026-27_asta.csv");
 
-const ATTESI = { P: 72, D: 200, C: 199, A: 120 };
-const TOTALE = 591;
+const ATTESI = { P: 60, D: 200, C: 199, A: 120 };
+const TOTALE = 579;
 
 // ---------------------------------------------------------------- parser
 function verifica(esito, etichetta) {
@@ -32,15 +32,21 @@ function verifica(esito, etichetta) {
   // TUTTI con la squadra di appartenenza (colonna obbligatoria di questo listone)
   assert.strictEqual(esito.giocatori.filter((g) => g.squadra).length, TOTALE, etichetta + ": squadra su tutti");
   const perNome = Object.fromEntries(esito.giocatori.map((g) => [g.nome, g]));
-  assert.strictEqual(perNome["Malen"].quotazioneBase, 98, etichetta + ": Malen 98");
-  assert.strictEqual(perNome["Malen"].squadra, "Roma", etichetta + ": Malen Roma");
-  assert.strictEqual(perNome["Martinez L."].quotazioneBase, 83, etichetta + ": Lautaro 83");
-  assert.strictEqual(perNome["Martinez L."].squadra, "Inter", etichetta + ": Lautaro Inter");
-  assert.strictEqual(perNome["Dimarco"].quotazioneBase, 42, etichetta + ": Dimarco 42");
-  assert.strictEqual(perNome["Calhanoglu"].quotazioneBase, 65, etichetta + ": Calhanoglu 65");
-  assert.strictEqual(perNome["Svilar"].ruolo, "P", etichetta + ": Svilar P");
-  assert.strictEqual(perNome["Svilar"].quotazioneBase, 40, etichetta + ": Svilar 40");
-  assert.strictEqual(perNome["Martinez L."].ruolo, "A", etichetta + ": Lautaro A");
+  assert.strictEqual(perNome["MALEN D."].squadra, "Roma", etichetta + ": Malen Roma");
+  assert.strictEqual(perNome["MALEN D."].quotazioneBase, 98, etichetta + ": Malen 98");
+  assert.strictEqual(perNome["MARTINEZ L."].quotazioneBase, 83, etichetta + ": Lautaro 83");
+  assert.strictEqual(perNome["MARTINEZ L."].squadra, "Inter", etichetta + ": Lautaro Inter");
+  assert.strictEqual(perNome["DIMARCO F."].quotazioneBase, 42, etichetta + ": Dimarco 42");
+  assert.strictEqual(perNome["CALHANOGLU H."].quotazioneBase, 65, etichetta + ": Calhanoglu 65");
+  assert.strictEqual(perNome["SVILAR M."].ruolo, "P", etichetta + ": Svilar P");
+  assert.strictEqual(perNome["SVILAR M."].quotazioneBase, 40, etichetta + ": Svilar 40");
+  assert.strictEqual(perNome["MARTINEZ L."].ruolo, "A", etichetta + ": Lautaro A");
+  // PORTIERI A BLOCCHI DI TRE DELLA STESSA SQUADRA (regola 09/09)
+  const portieri = esito.giocatori.filter((g) => g.ruolo === "P");
+  for (let i = 0; i < portieri.length; i += 3) {
+    assert.strictEqual(portieri[i].squadra, portieri[i + 1].squadra, etichetta + ": trii porta consecutivi alla posizione " + i);
+    assert.strictEqual(portieri[i].squadra, portieri[i + 2].squadra, etichetta + ": trii porta consecutivi alla posizione " + i);
+  }
   console.log("OK parser", etichetta, "-", TOTALE, "giocatori", JSON.stringify(ATTESI));
 }
 
@@ -94,9 +100,10 @@ function primaVistaSse(porta, query) {
     assert.strictEqual((await chiama(porta, "/api/avvia", "POST", JSON.stringify({ pin }), { "Content-Type": "application/json" })).stato, 200);
     const vb = await primaVistaSse(porta, "pin=" + pin);
     assert.strictEqual(vb.fase, "ATTESA_OFFERTE");
-    assert.strictEqual(vb.giocatore.nome, "Malen", "primo all'asta = quota più alta (ordine A→C→P→D)");
+    assert.strictEqual(vb.giocatore.nome, "MALEN D.", "primo all'asta = quota più alta (ordine A→C→P→D)");
     assert.strictEqual(vb.giocatore.quotazioneBase, 98);
     assert.strictEqual(vb.giocatore.squadra, "Roma");
+    // blocco porta visibile quando il corrente è un portiere: simulo avanzando alla sezione P? no: qui primo è A. Verifica del campo nella lista P via API resta nel collaudo parser.
     assert.deepStrictEqual(vb.statistiche.A, { totale: 120, venduti: 0, svincolati: 0, inCoda: 119 });
     assert.strictEqual(vb.codaRimanente, TOTALE - 1);
     console.log("OK server: asta avviata, primo giocatore", vb.giocatore.nome, vb.giocatore.squadra, vb.giocatore.quotazioneBase, "FMM, coda", vb.codaRimanente);

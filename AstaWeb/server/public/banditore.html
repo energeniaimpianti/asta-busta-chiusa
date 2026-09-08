@@ -24,6 +24,11 @@
     font-size:15px; font-weight:700; letter-spacing:.3px;
   }
   .quot-min b { font-size:30px; font-weight:900; color:#5dade2; margin:0 4px; }
+  .blocco-porta {
+    font-size:13px; font-weight:700; text-align:center; margin:4px 0 2px;
+    color:#ffd54f; background:#33290f; border:1px solid #6b5b1e; border-radius:10px;
+    padding:6px 10px;
+  }
   /* squadra di appartenenza: sotto il nome, sopra la quotazione minima */
   .squadra-gioc {
     font-size:17px; font-weight:700; text-align:center; margin:2px 0 4px;
@@ -537,6 +542,7 @@ function pannelloGiocatore() {
     <span class="badge-ruolo r-${g.ruolo}">${g.ruolo} · ${{P:"Portiere",D:"Difensore",C:"Centrocampista",A:"Attaccante"}[g.ruolo]}</span>
     <div class="giocatore-nome">${esc(g.nome)}</div>
     ${g.squadra ? `<div class="squadra-gioc">🛡 ${esc(g.squadra)}</div>` : ""}
+    ${g.bloccoPorta ? `<div class="blocco-porta">🧤 blocco porta ${esc(g.squadra)}: ${g.bloccoPorta.map(esc).join(" · ")}</div>` : ""}
     <div class="quot-min">Quotazione minima<b>${g.quotazioneBase}</b>FMM</div>
     ${vista.spareggio ? `<div style="margin-top:6px"><b>⚖ Spareggio${(vista.spareggio.giri || 1) > 1 ? " — giro " + vista.spareggio.giri : ""} al pari di ${vista.spareggio.pari}${(vista.spareggio.giri || 1) > 1 ? " (aggiornato all'ultimo giro)" : ""}</b> — ognuno dei pari può ripetere la propria puntata o salire (non ci si ritira): la monetina scatta solo dopo il secondo pareggio consecutivo CON LA STESSA puntata; se alzano, si ripete</div>` : ""}
   </div>`;
