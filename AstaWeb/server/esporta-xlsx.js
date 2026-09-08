@@ -375,7 +375,7 @@ function generaXlsx(stato) {
     const annullati = new Set();
     const nonVendutiSet = new Set(stato.nonVenduti);
     for (const ev of stato.eventi) {
-      if (ev.tipo === "Aggiudicazione" || ev.tipo === "Sorteggio") { aggiudicazioni.set(ev.idGiocatore, ev); annullati.delete(ev.idGiocatore); }
+      if (ev.tipo === "Aggiudicazione" || ev.tipo === "Sorteggio" || ev.tipo === "AssegnazioneManuale") { aggiudicazioni.set(ev.idGiocatore, ev); annullati.delete(ev.idGiocatore); }
       if (ev.tipo === "AnnullamentoAggiudicazione") { aggiudicazioni.delete(ev.idGiocatore); annullati.add(ev.idGiocatore); }
     }
 
@@ -419,6 +419,7 @@ function generaXlsx(stato) {
       else if (!agg && nonVendutiSet.has(g.id)) nota = "SVINCOLATO";
       if (agg && stato.eventi.some(e => e.tipo === "Sorteggio" && e.idGiocatore === g.id)) nota = "SORTEGGIO";
       if (chiamatePer.get(g.id) && chiamatePer.get(g.id).size > 1) nota = (nota ? nota + " · " : "") + "RICHIAMATO";
+      if (agg && agg.tipo === "AssegnazioneManuale") nota = (nota ? nota + " · " : "") + "ASSEGNATO DAL BANDITORE";
 
       const isWinner = !!agg;
       righe.push([

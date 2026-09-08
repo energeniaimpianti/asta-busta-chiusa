@@ -327,6 +327,20 @@ const ok = (msg) => { CHECK++; console.log("OK " + msg); };
     const tRosab = await testo(pagB);
     assert(tRosab.includes("Kean") && !tRosab.includes("Lautaro Martinez"), "rosa di Giovanni senza Lautaro, con Kean");
     ok("regie: crediti Bruno → 333, Lautaro annullato (Giovanni rimborsato → 470)");
+    // assegnazione manuale: un giocatore ancora libero a Bruno, al prezzo che decide il banditore
+    // (dopo il ridisegno del setBudget le regie si sono richiuse: si riaprono)
+    await pagA.click(".regie summary");
+    const libero = await pagA.$$eval("#regia-liberi option", (os) => os.map((o) => o.value));
+    assert(libero.length > 0, "ci sono giocatori liberi da assegnare");
+    await pagA.type("#regia-giocatore", "Pulisic");
+    await pagA.select("#regia-destinatario", "1"); // Bruno
+    await pagA.type("#regia-prezzo", "3");
+    await pagA.$eval("#regia-assegna", (b) => b.click());
+    await pagA.waitForFunction(() => document.body.innerText.includes("Assegnato: Pulisic"), { timeout: 8000 });
+    const vBruno = await pagA.evaluate(() => { const s = vista.squadre.find((x) => x.nome === "Bruno"); return { rosa: s.rosa.some((a) => a.nome === "Pulisic"), budget: s.budgetResiduo }; });
+    assert(vBruno.rosa, "Pulisic nella rosa di Bruno");
+    assert(vBruno.budget === 330, "budget Bruno scalato di 3: " + vBruno.budget);
+    ok("regie: assegnazione MANUALE — Pulisic a Bruno per 3 FMM (sotto quotazione)");
 
     const rX = await fetch(BASE + "/api/esporta.xlsx?pin=" + PIN);
     assert(rX.status === 200, "download xlsx");
@@ -340,7 +354,7 @@ const ok = (msg) => { CHECK++; console.log("OK " + msg); };
     for (let i = 1; i <= 5; i++) assert(voci["xl/worksheets/sheet" + i + ".xml"], "sheet" + i + " mancante");
     // le regie si vedono nell'Excel: Lautaro ANNULLATO nel foglio Asta completa, 333 nel Riepilogo
     assert(voci["xl/worksheets/sheet3.xml"].toString("utf8").includes("ANNULLATO"), "annullamento tracciato nel foglio Asta completa");
-    assert(voci["xl/worksheets/sheet2.xml"].toString("utf8").includes("333"), "crediti corretti (333) nel foglio Riepilogo");
+    assert(voci["xl/worksheets/sheet2.xml"].toString("utf8").includes("330"), "crediti corretti (330 = 333 meno l assegnazione manuale) nel foglio Riepilogo");
     ok("Excel multi-foglio: 5 fogli, ANNULLATO e crediti 333 tracciati (" + Math.round(buf.length / 1024) + " KB)");
 
     console.log("\n=== E2E COMPLETO SUPERATO — " + CHECK + " checkpoint ===");

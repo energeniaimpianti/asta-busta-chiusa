@@ -262,6 +262,33 @@ test("spareggio a TRE pari: i quattro scenari convalidati da Giovanni (08/09)", 
   assert.strictEqual(m3.stato.rivelazione.spareggio.length, 3, "ultimo giro (tre buste) in r.spareggio");
 });
 
+test("assegnaManuale: il banditore assegna un libero al prezzo che decide (anche sotto quotazione)", () => {
+  const m = new MotoreAsta();
+  m.avvia(cfgStd(), parts8(), listaStd());
+  // svincola il primo giocatore (tutti passano)
+  for (let i = 1; i <= 8; i++) m.offri(i, 0);
+  m.prossimo(); // Attaccante Due
+  // assegna lo svincolato (id 0) a P3 per 1 (quotazione 20: ben sotto)
+  const esito = m.assegnaManuale(0, 3, 1);
+  assert.strictEqual(esito.ok, true);
+  assert.strictEqual(m.stato.squadre[3].rosa.some((a) => a.idGiocatore === 0), true);
+  assert.strictEqual(m.stato.squadre[3].budgetResiduo, 499);
+  assert.ok(!m.stato.nonVenduti.includes(0), "tolto dagli svincolati");
+  assert.ok(m.stato.eventi.some((e) => e.tipo === "AssegnazioneManuale" && e.idGiocatore === 0 && e.importo === 1));
+  // giocatore in coda: assegnabile, esce dalla coda
+  assert.ok(m.stato.coda.includes(2), "il centrocampista è in coda");
+  assert.strictEqual(m.assegnaManuale(2, 5, 7).ok, true);
+  assert.ok(!m.stato.coda.includes(2), "tolto dalla coda");
+  assert.strictEqual(m.stato.squadre[5].budgetResiduo, 493);
+  // errori attesi
+  assert.strictEqual(m.assegnaManuale(0, 4, 1).ok, false, "già assegnato");
+  assert.strictEqual(m.assegnaManuale(999, 4, 1).ok, false, "inesistente");
+  assert.strictEqual(m.assegnaManuale(1, 4, 1).ok, false, "corrente all'asta: no");
+  assert.strictEqual(m.assegnaManuale(3, 5, 1).ok, false, "reparto pieno: P5 ha già il centrocampista id2");
+  assert.strictEqual(m.assegnaManuale(4, 3, 99999).ok, false, "importo oltre budget");
+  assert.strictEqual(m.assegnaManuale(4, 3, 2.5).ok, false, "importo non intero");
+});
+
 test("annullaAssegnazione: QUALSIASI assegnazione, in qualsiasi momento", () => {
   const m = new MotoreAsta();
   m.avvia(cfgStd(), parts8(), listaStd());

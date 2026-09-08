@@ -528,6 +528,34 @@ class MotoreAsta {
     return { ok: true, giocatore: g.nome, partecipante: nomeDi(pidVenditore), importo: acquisto.importo };
   }
 
+  /** Assegnazione MANUALE del banditore (09/09): un giocatore ancora libero (in coda
+   *  o svincolato) a un partecipante, al prezzo che decide lui — anche sotto la
+   *  quotazione. Unici vincoli di coerenza: posto libero nel reparto e budget che
+   *  basta; il giocatore attualmente all'asta non si può assegnare a mano. */
+  assegnaManuale(idGiocatore, idPartecipante, importo) {
+    const s = this.stato;
+    const g = s.listaById[idGiocatore];
+    if (!g) return { ok: false, errore: "Giocatore sconosciuto" };
+    if (s.fase === FASI.ATTESA || s.fase === FASI.SPAREGGIO) {
+      if (s.correnteId === idGiocatore) return { ok: false, errore: "Questo giocatore è all'asta adesso: aspetta la chiusura del round" };
+    }
+    const giaAssegnato = Object.keys(s.squadre).some((pid) => s.squadre[pid].rosa.some((a) => a.idGiocatore === idGiocatore));
+    if (giaAssegnato) return { ok: false, errore: "Giocatore già assegnato" };
+    if (!s.squadre[idPartecipante]) return { ok: false, errore: "Partecipante sconosciuto" };
+    const sq = s.squadre[idPartecipante];
+    if (this._countRuolo(idPartecipante, g.ruolo) >= this._quota(g.ruolo))
+      return { ok: false, errore: "Reparto pieno per " + (s.partecipanti.find((p) => p.id === idPartecipante) || {}).nome };
+    const n = Number(importo);
+    if (!Number.isInteger(n) || n < 0 || n > sq.budgetResiduo)
+      return { ok: false, errore: "Importo non valido (0–" + sq.budgetResiduo + ")" };
+    sq.budgetResiduo -= n;
+    sq.rosa.push({ idGiocatore: g.id, importo: n });
+    s.coda = s.coda.filter((id) => id !== idGiocatore);
+    s.nonVenduti = s.nonVenduti.filter((id) => id !== idGiocatore);
+    this._evento("AssegnazioneManuale", { idGiocatore: g.id, idPartecipante, importo: n, roundId: s.roundId });
+    return { ok: true, giocatore: g.nome, partecipante: (s.partecipanti.find((p) => p.id === idPartecipante) || {}).nome, importo: n };
+  }
+
   /** Il banditore può correggere i crediti di chiunque in qualsiasi momento (07/09/2026). */
   impostaBudget(pid, budget) {
     const s = this.stato;
@@ -1034,6 +1062,9 @@ function creaServer(opzioni = {}) {
       rivelazione: s.rivelazione,
       squadre: vistaSquadre(),
       tuttiCompleti: sessione.motore.tuttiCompleti,
+      giocatoriLiberi: s.fase === "FINE" || s.fase === "RIVELAZIONE"
+        ? _giocatoriLiberi(s)
+        : _giocatoriLiberi(s),
       // annuncio CACHATO alla nascita della rivelazione: "Ripeti voce" e il testo
       // mostrato coincidono con quanto pronunciato (non rigenerato a ogni broadcast)
       ultimoAnnuncio: s.rivelazione ? (s.rivelazione.annuncio || generaAnnuncio(s.rivelazione)) : null,
@@ -1092,6 +1123,14 @@ function creaServer(opzioni = {}) {
         importo: a.importo,
       })),
     }));
+  }
+
+  /** Giocatori LIBERI (non assegnati, non all'asta adesso) per l'assegnazione manuale. */
+  function _giocatoriLiberi(s) {
+    const assegnati = new Set();
+    for (const sq of Object.values(s.squadre)) for (const a of sq.rosa) assegnati.add(a.idGiocatore);
+    return s.lista.filter((g) => !assegnati.has(g.id) && g.id !== s.correnteId)
+      .map((g) => ({ id: g.id, nome: g.nome, ruolo: g.ruolo, squadra: g.squadra || "", quotazioneBase: g.quotazioneBase }));
   }
 
   /** Aggiudicazioni annullate e NON successivamente riassegnate (in ordine cronologico):
@@ -1354,6 +1393,9 @@ function creaServer(opzioni = {}) {
         case "annullaAssegnazione":
           if (!Number.isInteger(Number(dati.idGiocatore))) { esito = { ok: false, errore: "idGiocatore mancante" }; break; }
           esito = sessione.motore.annullaAssegnazione(Number(dati.idGiocatore));
+          break;
+        case "assegnaManuale":
+          esito = sessione.motore.assegnaManuale(Number(dati.idGiocatore), Number(dati.pid), dati.importo);
           break;
         case "setBudget":
           esito = sessione.motore.impostaBudget(Number(dati.pid), dati.budget);

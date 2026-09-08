@@ -573,9 +573,21 @@ function pannelloRegie() {
   if (!vista.squadre) return "";
   return `<details class="regie"><summary>🛠 Regie del banditore — annulla assegnazioni e crediti</summary>
     <div class="card">
-      <p class="muto" style="margin:4px 0 8px">Annullare un'assegnazione restituisce i crediti e rimette il giocatore in gioco. I crediti si possono correggere in qualunque momento.</p>
+      <p class="muto" style="margin:4px 0 8px">Annullare un'assegnazione restituisce i crediti e rimette il giocatore in gioco. I crediti si possono correggere in qualunque momento. Puoi anche ASSEGNARE tu un giocatore libero a un partecipante, al prezzo che decidi (anche sotto quotazione).</p>
+      <div class="regia-assegna" style="border-bottom:1px solid #22334a">
+        <div class="regia-testa"><b>➕ Assegnazione manuale</b></div>
+        <div class="riga" style="gap:6px;margin-top:6px">
+          <input type="text" id="regia-giocatore" list="regia-liberi" placeholder="Giocatore libero…" style="flex:2;min-width:140px" autocomplete="off">
+          <datalist id="regia-liberi">${(vista.giocatoriLiberi || []).map((g) => `<option value="${esc(g.nome)}">`).join("")}</datalist>
+          <select id="regia-destinatario" style="flex:1;min-width:90px;background:#0a111c;color:var(--testo);border:2px solid #2b3b50;border-radius:8px;padding:6px">
+            ${(vista.squadre || []).map((s) => `<option value="${s.id}">${esc(s.nome)}</option>`).join("")}
+          </select>
+          <input type="number" id="regia-prezzo" min="0" placeholder="FMM" style="width:80px;padding:6px;text-align:right;border-radius:8px;border:2px solid #2b3b50;background:#0a111c;color:var(--testo)">
+          <button class="mini" id="regia-assegna">➕ Assegna</button>
+        </div>
+      </div>
       ${vista.squadre.map((s) => `
-      <div class="regia-sq">
+      <div class="regia-sq" data-nome="${esc(s.nome)}">
         <div class="regia-testa">
           <b>${esc(s.nome)}</b> <span class="muto">(${s.rosa.length}/25)</span>
           <span class="regia-budget">crediti
@@ -660,8 +672,17 @@ function applicaVis() {
   }
 }
 
+// i nomi TUTTI IN MAIUSCOLO del listone definitivo ("MALEN D.") vengono letti dal
+// sintetizzatore come SIGLE, lettera per lettera ("M A L E N"): si restituiscono
+// come parole normali ("Malen D.") SOLO alla voce (a schermo resta il maiuscolo)
+function vocaleSeUmano(testo) {
+  return String(testo).replace(/[A-ZÀÈÉÌÒÙ][A-ZÀÈÉÌÒÙ'.]{1,}(?:\s+[A-Z]\.)*/g, (m) =>
+    m.split(/\s+/).map((p) => p.charAt(0) + p.slice(1).toLowerCase()).join(" "));
+}
+
 function parla(testo) {
   try {
+    testo = vocaleSeUmano(testo);
     const synth = window.speechSynthesis;
     if (!synth) { toast("Voce non disponibile su questo browser"); return; }
     synth.cancel();
@@ -773,6 +794,20 @@ document.addEventListener("click", async (e) => {
   if (t.id === "nuova") {
     if (!confirm("Azzerare definitivamente squadre e sessione?")) return;
     try { await post("/api/nuova", { pin }); location.reload(); } catch (err) { toast(err.message); }
+    return;
+  }
+  if (t.id === "regia-assegna") {
+    const nomeG = (document.getElementById("regia-giocatore") || {}).value || "";
+    const pidSel = Number((document.getElementById("regia-destinatario") || {}).value);
+    const prezzo = parseInt((document.getElementById("regia-prezzo") || {}).value, 10);
+    const g = ((vista.giocatoriLiberi || []).find((x) => x.nome.toLowerCase() === nomeG.trim().toLowerCase())) || null;
+    if (!g) { toast("Scegli un giocatore libero dall'elenco"); return; }
+    if (!Number.isInteger(prezzo)) { toast("Scrivi il prezzo in fantamilioni"); return; }
+    if (!confirm(`Assegnare ${g.nome} (${g.squadra}) a ${(vista.squadre.find((s) => s.id === pidSel) || {}).nome} per ${prezzo} FMM, di tua iniziativa?`)) return;
+    try {
+      await post("/api/azione", { pin, azione: "assegnaManuale", idGiocatore: g.id, pid: pidSel, importo: prezzo });
+      toast("Assegnato: " + g.nome);
+    } catch (err) { toast(err.message); }
     return;
   }
   if (t.dataset.setbudget != null) {
