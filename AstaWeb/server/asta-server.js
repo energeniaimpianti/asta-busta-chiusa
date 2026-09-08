@@ -106,6 +106,7 @@ class MotoreAsta {
       spareggi: 0,
       ultimoPareggio: 0,      // importo dell'ultimo pareggio (serve al conteggio delle ripetizioni)
       ripetizioniPareggio: 0, // quante volte CONSECUTIVE si è pareggiato con lo stesso importo
+      storiaSpareggi: [],     // ogni giro di spareggio chiuso (pid -> importo), per lo schermo
       squadre,
       nonVenduti: [],
       reinsertioni: {},
@@ -135,6 +136,7 @@ class MotoreAsta {
     s.offerte = {};
     s.offerteRoundPrincipale = {};
     s.ultimoSpareggio = {};
+    s.storiaSpareggi = [];
     s.candidatiSpareggio = [];
     s.spareggi = 0;
     s.rivelazione = null;
@@ -163,7 +165,11 @@ class MotoreAsta {
   }
 
   _pariCorrente() {
-    const base = this.stato.spareggi > 0 ? this.stato.offerteRoundPrincipale : this.stato.offerte;
+    const s = this.stato;
+    // il pari da MOSTRARE è quello dell'ULTIMO giro chiuso: round principale al primo
+    // spareggio, giro precedente negli spareggi successivi (fix 08/09: prima restava
+    // sempre quello del round principale e i dispositivi non si aggiornavano)
+    const base = s.spareggi >= 2 ? s.ultimoSpareggio : (s.spareggi > 0 ? s.offerteRoundPrincipale : s.offerte);
     return Math.max(0, ...Object.values(base), 0);
   }
 
@@ -296,8 +302,12 @@ class MotoreAsta {
         if (maxV === s.ultimoPareggio) s.ripetizioniPareggio = (s.ripetizioniPareggio || 0) + 1;
         else s.ripetizioniPareggio = 1;
         s.ultimoPareggio = maxV;
-        if (s.ripetizioniPareggio >= 2) this._sorteggia(g, vincenti, maxV);
-        else this._apriSpareggioSuccessivo(g, vincenti);
+        if (s.ripetizioniPareggio >= 2) {
+          this._sorteggia(g, vincenti, maxV);
+        } else {
+          s.storiaSpareggi.push({ ...s.offerte });   // il giro chiuso resta visibile a tutti
+          this._apriSpareggioSuccessivo(g, vincenti);
+        }
       }
     }
   }
@@ -395,6 +405,11 @@ class MotoreAsta {
     const dettSpareggio = Object.entries(spareggio || {}).filter(([, v]) => v > 0)
       .sort((a, b) => a[1] - b[1] || nomeDi(Number(a[0])).localeCompare(nomeDi(Number(b[0]))))
       .map(([k, v]) => ({ partecipante: nomeDi(Number(k)), idPartecipante: Number(k), importo: v }));
+    const daOggetto = (o) => Object.entries(o || {}).filter(([, v]) => v > 0)
+      .sort((a, b) => a[1] - b[1] || nomeDi(Number(a[0])).localeCompare(nomeDi(Number(b[0]))))
+      .map(([k, v]) => ({ partecipante: nomeDi(Number(k)), idPartecipante: Number(k), importo: v }));
+    // tutti i giri di spareggio precedenti l'ultimo: la STORIA resta visibile sullo schermo
+    const storiaSpareggi = (s.storiaSpareggi || []).map((g) => daOggetto(g)).filter((g) => g.length);
     return {
       idGiocatore: g.id,
       giocatore: { id: g.id, nome: g.nome, ruolo: g.ruolo, squadra: g.squadra || "" },
@@ -405,6 +420,7 @@ class MotoreAsta {
       importoFinale,
       spareggi,
       spareggio: dettSpareggio,
+      storiaSpareggi,
       nonVenduto,
       sorteggiato: false,
       motivoNonVenduto: motivo,

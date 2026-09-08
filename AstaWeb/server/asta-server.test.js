@@ -243,14 +243,23 @@ test("spareggio a TRE pari: i quattro scenari convalidati da Giovanni (08/09)", 
   // ES 4 — 50-50-50 → 51-51-51 → 52-52-52 (sempre diversi dalla precedente) → OLTRANZA; ripetuto 52 → pesca
   m3 = setup3();
   m3.offri(1, 50); m3.offri(2, 50); m3.offri(3, 50); passanoGliAltri();
+  // il pari mostrato ai dispositivi si AGGIORNA a ogni giro (fix 08/09 notte)
+  assert.strictEqual(m3._pariCorrente(), 50, "S1: pari del round principale");
   m3.offri(1, 51); m3.offri(2, 51); m3.offri(3, 51);
   assert.strictEqual(m3.stato.fase, "SPAREGGIO", "alzando resta oltranza");
+  assert.strictEqual(m3._pariCorrente(), 51, "S2: pari aggiornato al primo spareggio");
   m3.offri(1, 52); m3.offri(2, 52); m3.offri(3, 52);
   assert.strictEqual(m3.stato.fase, "SPAREGGIO", "seconda salita pari: ancora oltranza");
+  assert.strictEqual(m3._pariCorrente(), 52, "S3: pari aggiornato al secondo spareggio");
   m3.offri(1, 52); m3.offri(2, 52); m3.offri(3, 52);
   assert.strictEqual(m3.stato.fase, "RIVELAZIONE");
   assert.strictEqual(m3.stato.rivelazione.sorteggiato, true, "ripetuto lo stesso 52 → pesca");
   assert.strictEqual(m3.stato.rivelazione.importoFinale, 52);
+  // la STORIA di tutti i giri resta visibile nella rivelazione (l'ultimo in r.spareggio)
+  assert.strictEqual(m3.stato.rivelazione.storiaSpareggi.length, 2, "due giri di storia + l'ultimo");
+  assert.strictEqual(m3.stato.rivelazione.storiaSpareggi[0][0].importo, 51, "primo giro: 51");
+  assert.strictEqual(m3.stato.rivelazione.storiaSpareggi[1][0].importo, 52, "secondo giro: 52");
+  assert.strictEqual(m3.stato.rivelazione.spareggio.length, 3, "ultimo giro (tre buste) in r.spareggio");
 });
 
 test("annullaAssegnazione: QUALSIASI assegnazione, in qualsiasi momento", () => {

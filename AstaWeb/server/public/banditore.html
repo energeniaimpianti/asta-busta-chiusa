@@ -538,7 +538,7 @@ function pannelloGiocatore() {
     <div class="giocatore-nome">${esc(g.nome)}</div>
     ${g.squadra ? `<div class="squadra-gioc">🛡 ${esc(g.squadra)}</div>` : ""}
     <div class="quot-min">Quotazione minima<b>${g.quotazioneBase}</b>FMM</div>
-    ${vista.spareggio ? `<div style="margin-top:6px"><b>⚖ Spareggio al pari di ${vista.spareggio.pari}</b> — ognuno dei pari può ripetere la propria puntata o salire (non ci si ritira): la monetina scatta solo dopo il secondo pareggio consecutivo CON LA STESSA puntata; se alzano, si ripete</div>` : ""}
+    ${vista.spareggio ? `<div style="margin-top:6px"><b>⚖ Spareggio${(vista.spareggio.giri || 1) > 1 ? " — giro " + vista.spareggio.giri : ""} al pari di ${vista.spareggio.pari}${(vista.spareggio.giri || 1) > 1 ? " (aggiornato all'ultimo giro)" : ""}</b> — ognuno dei pari può ripetere la propria puntata o salire (non ci si ritira): la monetina scatta solo dopo il secondo pareggio consecutivo CON LA STESSA puntata; se alzano, si ripete</div>` : ""}
   </div>`;
 }
 
@@ -593,7 +593,7 @@ const PASSO_BUSTA = 1100, PASSI_SILENZIO = 2;
 function pannelloRivelazione() {
   const r = vista.rivelazione;
   if (!r) return "";
-  const tot = r.offerteInOrdine.length + (r.spareggi > 0 ? r.spareggio.length + 1 : 1);
+  const tot = r.offerteInOrdine.length + (r.storiaSpareggi || []).reduce((a, g) => a + g.length, 0) + (r.spareggio || []).length + (r.spareggi > 0 ? 1 : 0);
   if (ultimoRoundAnnunciato !== vista.roundId) {
     ultimoRoundAnnunciato = vista.roundId; rivelati = 0;
     clearInterval(timerRiv);
@@ -605,10 +605,12 @@ function pannelloRivelazione() {
     ${r.giocatore.squadra ? `<div class="centro squadra-gioc">🛡 ${esc(r.giocatore.squadra)}</div>` : ""}
     <div id="offerte">`;
   r.offerteInOrdine.forEach((o, i) => { html += `<div class="offre" data-i="${i}"><span>✉️ ${esc(o.partecipante)} <em class="sigillo">busta sigillata…</em></span><b class="val">${o.importo}</b></div>`; });
-  if (r.spareggi > 0 && r.spareggio.length) {
-    html += `<div class="centro muto" style="margin-top:8px">Spareggio</div>`;
-    r.spareggio.forEach((o, i) => { html += `<div class="offre" data-i="${r.offerteInOrdine.length + i}"><span>✉️ ${esc(o.partecipante)} <em class="sigillo">busta sigillata…</em></span><b class="val">${o.importo}</b></div>`; });
-  }
+  let idxOff = r.offerteInOrdine.length;
+  const giriSpareggio = [...(r.storiaSpareggi || []), ...(r.spareggio && r.spareggio.length ? [r.spareggio] : [])];
+  giriSpareggio.forEach((giro, g) => {
+    html += `<div class="centro muto" style="margin-top:8px">Spareggio${giriSpareggio.length > 1 ? " · giro " + (g + 1) : ""}</div>`;
+    giro.forEach((o) => { html += `<div class="offre" data-i="${idxOff++}"><span>✉️ ${esc(o.partecipante)} <em class="sigillo">busta sigillata…</em></span><b class="val">${o.importo}</b></div>`; });
+  });
   html += `<div id="esito"></div></div>
     <div class="riga-azioni">
       <button class="btn btn-scuro" id="ripeti">🔊 Ripeti voce</button>
@@ -624,7 +626,7 @@ function applicaVis() {
   document.querySelectorAll(".offre").forEach((el) => { if (Number(el.dataset.i) < rivelati) el.classList.add("vis"); });
   const r = vista && vista.rivelazione;
   if (!r) return;
-  const tot = r.offerteInOrdine.length + (r.spareggi > 0 ? r.spareggio.length + 1 : 1);
+  const tot = r.offerteInOrdine.length + (r.storiaSpareggi || []).reduce((a, g) => a + g.length, 0) + (r.spareggio || []).length + (r.spareggi > 0 ? 1 : 0);
   if (rivelati >= tot + PASSI_SILENZIO) {
     const ann = document.getElementById("testo-annuncio");
     if (ann) ann.style.visibility = "visible"; // il testo accompagna la fine, non anticipa
