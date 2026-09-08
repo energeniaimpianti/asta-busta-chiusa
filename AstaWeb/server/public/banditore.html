@@ -87,6 +87,9 @@
   .riga-azioni .btn { min-height:48px; }
   #prova-voce.chiama { animation:pulsante 1s infinite alternate; }
   @keyframes pulsante { from { transform:scale(1); } to { transform:scale(1.06); } }
+  /* il lancio della monetina: gira in attesa del verdetto */
+  @keyframes lancio { 0% { transform:rotateY(0) scale(1); } 50% { transform:rotateY(180deg) scale(1.25); } 100% { transform:rotateY(360deg) scale(1); } }
+  .monetina-gira { font-size:64px; text-align:center; padding:18px 0; animation:lancio 1s linear infinite; }
 
   /* ---------- TELEFONO DEL BANDITORE: bottoni grandi, una colonna ---------- */
   @media (max-width:700px) {
@@ -630,6 +633,12 @@ function applicaVis() {
     esito.dataset.fatto = "1";
     if (r.nonVenduto) {
       esito.innerHTML = `<div class="nonvenduto">❌ Non venduto (${esc(r.motivoNonVenduto)})</div>`;
+    } else if (r.sorteggiato) {
+      // MONETINA: il lancio si vede prima del verdetto, come lo racconta la voce
+      esito.innerHTML = `<div class="monetina-gira">🪙</div><div class="muto centro">si lancia la monetina…</div>`;
+      setTimeout(() => {
+        esito.innerHTML = `<div class="vincitore" style="animation:vittoria 1.4s ease;">🪙🏆 ${esc(r.giocatore.nome)} → ${esc(r.vincitore)} per ${r.importoFinale} FMM</div><div class="muto centro">deciso dalla monetina</div>${r.passi.length ? `<div class="muto centro">Passo: ${r.passi.map(esc).join(", ")}</div>` : ""}`;
+      }, 2800);
     } else if (r.importoFinale >= 25) {
       // PREMIO ALTO: 2 secondi di suspense prima del vincitore
       esito.innerHTML = `<div style="text-align:center;font-size:28px;padding:16px;animation:pulsante 1s infinite alternate;">⏳</div>`;

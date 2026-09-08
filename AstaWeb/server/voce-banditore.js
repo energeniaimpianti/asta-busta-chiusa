@@ -258,13 +258,15 @@ function generaSorteggio(r, rng) {
   }
   if (r.importoFinale >= 25) t += _pick(SUSPENSE, "su", rnd) + " ";
   t += `Pareggio insuperabile! ${g}... `;
+  // il lancio della monetina si RACCONTA: ellissi = pause reali nel TTS
+  t += "Si lancia la monetina... e... ";
   t += _tmpl(_pick([
-    "la monetina ha deciso: è di {n} per {p}!",
+    "è caduta su {n}! {p} fantamilioni!",
     "il destino ha scelto {n}! {p} fantamilioni!",
     "la fortuna bacia {n}! {p}!",
-    "la monetina parla: {n}! Per {p}!",
+    "testa o croce? Ha vinto {n}! Per {p}!",
     "ha deciso la sorte, non il portafoglio: {n} per {p}!",
-    "testa o croce? È uscito {n}! {p} fantamilioni!",
+    "la monetina ha parlato: {n}! {p} fantamilioni!",
   ], "so", rnd), { nome: r.vincitore, prezzo: r.importoFinale });
   return t;
 }
