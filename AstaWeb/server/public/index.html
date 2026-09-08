@@ -58,6 +58,7 @@
   .card.ruolo-C { border-top:3px solid #2e7d32; } .card.ruolo-A { border-top:3px solid #c62828; }
   .pop { animation:pop .5s ease; }
   @keyframes pop { 0% { transform:scale(.9); opacity:.2; } 100% { transform:scale(1); opacity:1; } }
+  @keyframes battito { from { transform:scale(1); } to { transform:scale(1.15); } }
   .giocatore-nome { font-size:40px; font-weight:900; text-align:center; line-height:1.05; margin:8px 0; word-break:break-word; letter-spacing:.5px; }
   /* quotazione minima: EVIDENTE, subito sotto il nome del giocatore */
   .quot-min {
@@ -95,6 +96,11 @@
   .chip.ok { background:#1c4a26; color:#9be7ae; }
   .offre { font-size:22px; margin:6px 0; display:flex; justify-content:space-between; opacity:0; transform:translateY(6px); transition:all .45s; }
   .offre.vis { opacity:1; transform:none; }
+  /* apertura delle buste: sigillo finché chiuse, importo solo quando aperte */
+  .offre .val { visibility:hidden; }
+  .offre.vis .val { visibility:visible; }
+  .offre .sigillo { font-size:13px; font-style:italic; color:var(--muto); }
+  .offre.vis .sigillo { display:none; }
   .vincitore { font-size:21px; font-weight:900; color:var(--verde); margin-top:10px; animation:pop .7s ease; }
   .nonvenduto { font-size:20px; font-weight:800; color:var(--rosso); }
   .toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#3b1d1d; color:#ffd7d7; padding:12px 18px; border-radius:12px; font-size:15px; max-width:90%; display:none; z-index:9; }
@@ -317,23 +323,26 @@ function pannelloAsta() {
 
 let rivelati = 0;
 let timerRiv = null;
+// ritmo da tavolo da poker: una busta ogni ~1.1s in ordine crescente, poi
+// due passi di silenzio (tutte le buste sul tavolo) prima del verdetto
+const PASSO_BUSTA = 1100, PASSI_SILENZIO = 2;
 function pannelloRivelazione() {
   const r = vista.rivelazione;
   if (!r) return "";
   const tot = r.offerteInOrdine.length + (r.spareggi > 0 ? r.spareggio.length + 1 : 1);
-  if (window._ultRound !== vista.roundId) { window._ultRound = vista.roundId; rivelati = 0; clearInterval(timerRiv); timerRiv = setInterval(() => { if (rivelati < tot) { rivelati++; applicaVis(); } }, 500); }
+  if (window._ultRound !== vista.roundId) { window._ultRound = vista.roundId; rivelati = 0; clearInterval(timerRiv); timerRiv = setInterval(() => { if (rivelati < tot + PASSI_SILENZIO) { rivelati++; applicaVis(); } }, PASSO_BUSTA); }
   let html = `<div class="card">
     <div class="muto centro">Asta chiusa per</div>
     <div class="giocatore-nome">${esc(r.giocatore.nome)}</div>
     ${r.giocatore.squadra ? `<div class="centro squadra-gioc">🛡 ${esc(r.giocatore.squadra)}</div>` : ""}
     <div id="offerte">`;
   r.offerteInOrdine.forEach((o, i) => {
-    html += `<div class="offre" data-i="${i}"><span>${esc(o.partecipante)}</span><b>${o.importo}</b></div>`;
+    html += `<div class="offre" data-i="${i}"><span>✉️ ${esc(o.partecipante)} <em class="sigillo">busta sigillata…</em></span><b class="val">${o.importo}</b></div>`;
   });
   if (r.spareggi > 0 && r.spareggio.length) {
     html += `<div class="muto" style="margin-top:8px">Spareggio:</div>`;
     r.spareggio.forEach((o, i) => {
-      html += `<div class="offre" data-i="${r.offerteInOrdine.length + i}"><span>${esc(o.partecipante)}</span><b>${o.importo}</b></div>`;
+      html += `<div class="offre" data-i="${r.offerteInOrdine.length + i}"><span>✉️ ${esc(o.partecipante)} <em class="sigillo">busta sigillata…</em></span><b class="val">${o.importo}</b></div>`;
     });
   }
   html += `<div id="esito"></div></div></div>`;
@@ -347,11 +356,22 @@ function applicaVis() {
   const r = vista && vista.rivelazione;
   if (!r) return;
   const tot = r.offerteInOrdine.length + (r.spareggi > 0 ? r.spareggio.length + 1 : 1);
-  if (rivelati >= tot - 1) {
+  if (rivelati >= tot + PASSI_SILENZIO) {
     const esito = document.getElementById("esito");
-    if (esito) {
-      if (r.nonVenduto) esito.innerHTML = `<div class="nonvenduto centro">❌ Non venduto (${esc(r.motivoNonVenduto)})</div>`;
-      else esito.innerHTML = `<div class="vincitore centro">🏆 ${esc(r.giocatore.nome)} → ${esc(r.vincitore)} per ${r.importoFinale} FMM</div>${r.passi.length ? `<div class="muto centro">Passo: ${r.passi.map(esc).join(", ")}</div>` : ""}`;
+    if (esito && !esito.dataset.fatto) {
+      esito.dataset.fatto = "1";
+      if (r.nonVenduto) {
+        esito.innerHTML = `<div class="nonvenduto centro">❌ Non venduto (${esc(r.motivoNonVenduto)})</div>`;
+      } else if (r.importoFinale >= 25 && !esito.dataset.suspenseFatta) {
+        // premio alto: clessidra prima del nome del vincitore, come dal banditore
+        esito.dataset.suspenseFatta = "1";
+        esito.innerHTML = `<div style="text-align:center;font-size:30px;padding:14px;animation:battito 1s infinite alternate;">⏳</div>`;
+        setTimeout(() => {
+          esito.innerHTML = `<div class="vincitore centro" style="animation:pop .8s ease;">🏆 ${esc(r.giocatore.nome)} → ${esc(r.vincitore)} per ${r.importoFinale} FMM</div>${r.passi.length ? `<div class="muto centro">Passo: ${r.passi.map(esc).join(", ")}</div>` : ""}`;
+        }, 2000);
+      } else {
+        esito.innerHTML = `<div class="vincitore centro" style="animation:pop .8s ease;">🏆 ${esc(r.giocatore.nome)} → ${esc(r.vincitore)} per ${r.importoFinale} FMM</div>${r.passi.length ? `<div class="muto centro">Passo: ${r.passi.map(esc).join(", ")}</div>` : ""}`;
+      }
     }
   }
 }
