@@ -198,6 +198,61 @@ test("spareggio: giro con vincitore aggiudica (saliti 30-28 al secondo giro)", (
   assert.strictEqual(r.sorteggiato, false);
 });
 
+test("spareggio a TRE pari: i quattro scenari convalidati da Giovanni (08/09)", () => {
+  const setup3 = () => {
+    const m = new MotoreAsta();
+    m.avvia(cfgStd(), [
+      { id: 1, nome: "Anna" }, { id: 2, nome: "Bruno" }, { id: 3, nome: "Carla" },
+      { id: 4, nome: "Dario" }, { id: 5, nome: "Elba" }, { id: 6, nome: "Franco" },
+      { id: 7, nome: "Gino" }, { id: 8, nome: "Hugo" },
+    ], listaStd());
+    return m;
+  };
+  const passanoGliAltri = () => { for (let i = 4; i <= 8; i++) m3.offri(i, 0); };
+  let m3;
+
+  // ES 1 — 50-50-50 ripetuti identici → PESCA tra i tre
+  m3 = setup3();
+  m3.offri(1, 50); m3.offri(2, 50); m3.offri(3, 50); passanoGliAltri();
+  assert.strictEqual(m3.stato.fase, "SPAREGGIO");
+  m3.offri(1, 50); m3.offri(2, 50); m3.offri(3, 50);
+  assert.strictEqual(m3.stato.fase, "RIVELAZIONE");
+  assert.strictEqual(m3.stato.rivelazione.sorteggiato, true, "tre pari ripetuti → pesca");
+  assert.strictEqual(m3.stato.rivelazione.importoFinale, 50);
+  assert.ok(["Anna", "Bruno", "Carla"].includes(m3.stato.rivelazione.vincitore), "vincitore tra i tre");
+
+  // ES 2 — 50-50-50 → spareggio 50-51-50 → vince il 51, nessun sorteggio
+  m3 = setup3();
+  m3.offri(1, 50); m3.offri(2, 50); m3.offri(3, 50); passanoGliAltri();
+  m3.offri(1, 50); m3.offri(2, 51); m3.offri(3, 50);
+  assert.strictEqual(m3.stato.rivelazione.sorteggiato, false);
+  assert.strictEqual(m3.stato.rivelazione.vincitore, "Bruno");
+  assert.strictEqual(m3.stato.rivelazione.importoFinale, 51);
+
+  // ES 3 — 50-50-50 → 52-52-51: il terzo ESCE, i due pari continuano; ripetuto 52-52 → monetina tra DUE
+  m3 = setup3();
+  m3.offri(1, 50); m3.offri(2, 50); m3.offri(3, 50); passanoGliAltri();
+  m3.offri(1, 52); m3.offri(2, 52); m3.offri(3, 51);
+  assert.strictEqual(m3.stato.fase, "SPAREGGIO", "il terzo esce, i due pari continuano");
+  assert.deepStrictEqual(m3.stato.candidatiSpareggio.sort(), [1, 2]);
+  m3.offri(1, 52); m3.offri(2, 52);
+  assert.strictEqual(m3.stato.rivelazione.sorteggiato, true);
+  assert.strictEqual(m3.stato.rivelazione.importoFinale, 52);
+  assert.ok(["Anna", "Bruno"].includes(m3.stato.rivelazione.vincitore), "vincitore tra i due rimasti");
+
+  // ES 4 — 50-50-50 → 51-51-51 → 52-52-52 (sempre diversi dalla precedente) → OLTRANZA; ripetuto 52 → pesca
+  m3 = setup3();
+  m3.offri(1, 50); m3.offri(2, 50); m3.offri(3, 50); passanoGliAltri();
+  m3.offri(1, 51); m3.offri(2, 51); m3.offri(3, 51);
+  assert.strictEqual(m3.stato.fase, "SPAREGGIO", "alzando resta oltranza");
+  m3.offri(1, 52); m3.offri(2, 52); m3.offri(3, 52);
+  assert.strictEqual(m3.stato.fase, "SPAREGGIO", "seconda salita pari: ancora oltranza");
+  m3.offri(1, 52); m3.offri(2, 52); m3.offri(3, 52);
+  assert.strictEqual(m3.stato.fase, "RIVELAZIONE");
+  assert.strictEqual(m3.stato.rivelazione.sorteggiato, true, "ripetuto lo stesso 52 → pesca");
+  assert.strictEqual(m3.stato.rivelazione.importoFinale, 52);
+});
+
 test("annullaAssegnazione: QUALSIASI assegnazione, in qualsiasi momento", () => {
   const m = new MotoreAsta();
   m.avvia(cfgStd(), parts8(), listaStd());
