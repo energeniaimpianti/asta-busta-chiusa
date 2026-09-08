@@ -378,7 +378,7 @@ function schermataSetup() {
 
   <div class="card">
     <h2 style="margin-top:0">1 · Fa' collegare i partecipanti</h2>
-    <p class="muto">Sullo stesso Wi-Fi: aprono la fotocamera o il browser e vanno su questo indirizzo (oppure scannerizzano il QR):</p>
+    <p class="muto"><b>A TUTTI — in stanza e da casa — si manda il link https:// che compare nella finestra nera</b> (un solo messaggio su WhatsApp): vale per ogni rete, anche dati mobili. Chi è fisicamente lì con te può in alternativa inquadrare il QR qui sotto.</p>
     <div id="indirizzi" class="centro"><span class="muto">calcolo indirizzi…</span></div>
     <div class="centro" style="margin-top:10px"><span class="qr" id="qr"></span></div>
   </div>
@@ -460,7 +460,9 @@ async function wiringSetup() {
     document.getElementById("indirizzi").innerHTML = `
       <div style="margin:8px 0;padding:12px;background:#132530;border:2px solid #2e86c1;border-radius:10px;">
         <div class="indirizzo" style="font-size:22px;word-break:break-all;user-select:all;cursor:pointer;" onclick="copiaIndirizzo('${url}', this)" title="tocca per copiare">${url}</div>
-        <div class="muto" style="margin-top:6px;font-size:12px;">${viaTunnel ? "👈 collega TUTTI con questo indirizzo (sei arrivato da internet)" : "👈 tocca per COPIARE — oppure inquadrane il QR sotto"}</div>
+        <div class="muto" style="margin-top:6px;font-size:12px;">${viaTunnel
+          ? "👈 collega TUTTI con questo indirizzo (sei arrivato da internet)"
+          : "⚠️ Questo indirizzo funziona SOLO per chi è fisicamente qui con te (stessa rete). A TUTTI i partecipanti — anche a chi sta da casa — manda invece il link https:// della FINESTRA NERA, su WhatsApp"}</div>
       </div>`;
     try {
       // versione AUTOMATICA (la più piccola che contiene l'indirizzo: una versione
