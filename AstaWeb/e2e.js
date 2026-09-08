@@ -89,6 +89,9 @@ const ok = (msg) => { CHECK++; console.log("OK " + msg); };
     await pagB.click("#vai");
     await pagB.waitForFunction(() => document.body.innerText.includes("Registrato come"), { timeout: 8000 });
     ok("partecipante registrato dalla sua pagina");
+    // pre-avvio: chi si ritrova col nome di un altro (browser già usato) deve poter uscire
+    assert((await testo(pagB)).includes("Non sei tu?"), "link cambia-persona visibile GIÀ nella schermata pre-avvio");
+    ok("rientro pre-avvio: «Non sei tu?» presente sotto «Registrato come»");
 
     const rHugo = await api("/api/entra", JSON.stringify({ nome: "Hugo" }));
     assert(rHugo.stato === 200, "registrazione Hugo");
