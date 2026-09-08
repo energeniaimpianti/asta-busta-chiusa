@@ -344,6 +344,9 @@ class MotoreAsta {
     if (definitivo) s.nonVenduti.push(g.id);
     s.fase = FASI.RIVELAZIONE;
     s.rivelazione = this._rivelazione(g, base, null, 0, s.spareggi, s.ultimoSpareggio, true, motivo);
+    // provvisorio = il giocatore NON è svincolato: torna in coda e verrà richiamato
+    // (la voce lo annuncia diversamente — fix 08/09/2026)
+    s.rivelazione.provvisorio = !definitivo;
     s.rivelazione.annuncio = generaAnnuncio(s.rivelazione);
     this._evento("NonVenduto", { roundId: s.roundId, idGiocatore: g.id, motivo });
   }
@@ -1013,6 +1016,7 @@ function creaServer(opzioni = {}) {
       rosaCount: s.squadre[pid].rosa.length,
       rivelazione: s.rivelazione, // dopo la chiusura si vede da tutti, telefoni compresi
       squadre: vistaSquadre(),
+      annullati: annullatiCorrenti(),
     };
     return out;
   }
@@ -1032,6 +1036,22 @@ function creaServer(opzioni = {}) {
         importo: a.importo,
       })),
     }));
+  }
+
+  /** Aggiudicazioni annullate e NON successivamente riassegnate (in ordine cronologico):
+   *  serve a chi legge la vista partecipante da programma per distinguere "annullato dal
+   *  banditore" da "dato mancante" (stessa logica del foglio Excel "Asta completa"). */
+  function annullatiCorrenti() {
+    const s = sessione.motore.stato;
+    if (!s) return [];
+    const out = new Map();
+    for (const ev of s.eventi) {
+      if (ev.tipo === "AnnullamentoAggiudicazione")
+        out.set(ev.idGiocatore, { idGiocatore: ev.idGiocatore, idPartecipante: ev.idPartecipante, importo: ev.importo, ts: ev.ts });
+      else if (ev.tipo === "Aggiudicazione" || ev.tipo === "Sorteggio")
+        out.delete(ev.idGiocatore);
+    }
+    return [...out.values()];
   }
 
   function dopoMossa() {

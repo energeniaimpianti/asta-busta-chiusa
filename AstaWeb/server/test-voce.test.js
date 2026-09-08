@@ -242,8 +242,24 @@ test("voce: non venduto a zero offerte — Nessuna offerta + commento dal pool",
   const { generaAnnuncio, POOL } = motoreFresco();
   const ann = generaAnnuncio(riv({ nonVenduto: true, motivoNonVenduto: "nessuna offerta", vincitore: null, importoFinale: 0 }), () => 0.7);
   assert.ok(ann.includes("Nessuna offerta."), "manca 'Nessuna offerta.': " + ann);
-  assert.ok(contieneUna(ann, POOL.COMMENTI_NON_VENDUTO.map((f) => f.trim())), "manca commento non venduto: " + ann);
-  assert.ok(ann.includes("resta svincolato"), "manca svincolato: " + ann);
+  assert.ok(contieneUna(ann, POOL.COMMENTI_NON_VENDUTO.map((f) => f.trim())), "manca commento non venduto");
+  assert.ok(ann.includes("resta svincolato"), "manca svincolato");
+});
+
+test("voce: TUTTI HANNO PASSATO (buste a zero consegnate) — frase diversa da 'nessuna offerta'; provvisorio distinto", () => {
+  const { generaAnnuncio } = motoreFresco();
+  // primo giro: tutti passano, il giocatore TORNA IN CODA (provvisorio)
+  const primo = riv({ nonVenduto: true, motivoNonVenduto: "nessuna offerta", passi: ["Anna", "Bob", "Carla", "Dario", "Elba", "Franco", "Gino", "Hugo"], provvisorio: true, vincitore: null, importoFinale: 0 });
+  const a1 = generaAnnuncio(primo, () => 0.7);
+  assert.ok(a1.includes("Hanno passato tutti."), "manca 'Hanno passato tutti.': " + a1);
+  assert.ok(!a1.includes("Nessuna offerta"), "'Nessuna offerta' indebito con 8 passi: " + a1);
+  assert.ok(a1.includes("torna in coda"), "prima volta deve dire che torna in coda: " + a1);
+  assert.ok(!a1.includes("resta svincolato"), "'resta svincolato' indebito al primo giro: " + a1);
+  // secondo giro (richiamo): definitivo
+  const secondo = riv({ nonVenduto: true, motivoNonVenduto: "nessuna offerta", passi: ["Anna", "Bob"], vincitore: null, importoFinale: 0 });
+  const a2 = generaAnnuncio(secondo, () => 0.7);
+  assert.ok(a2.includes("resta svincolato"), "secondo giro deve dire svincolato: " + a2);
+  assert.ok(!a2.includes("torna in coda"), "'torna in coda' indebito al secondo giro: " + a2);
 });
 
 test("voce: non venduto per reparti pieni — 'Nessuno poteva offrire', senza prese in giro", () => {

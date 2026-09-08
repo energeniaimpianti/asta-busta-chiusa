@@ -287,11 +287,15 @@ function generaNonVenduto(r, rng) {
 
   if (r.offerteInOrdine.length > 0) {
     t = _legge(t, r.offerteInOrdine.slice(-_n(3, 4, rnd)), rnd);
+  } else if ((r.passi || []).length > 0) {
+    // tutti hanno CONSEGNATO la busta con zero: è una scelta, non un guasto
+    t += "Hanno passato tutti. ";
   } else {
     t += "Nessuna offerta. ";
   }
   t += _pick(COMMENTI_NON_VENDUTO, "nv", rnd) + " ";
-  t += `${g} resta svincolato.`;
+  // provvisorio: il giocatore torna in coda e verrà richiamato a fine reparto
+  t += r.provvisorio ? `${g} torna in coda: lo richiamiamo a fine reparto.` : `${g} resta svincolato.`;
   return t;
 }
 

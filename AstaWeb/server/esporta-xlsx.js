@@ -387,12 +387,25 @@ function generaXlsx(stato) {
       }
     }
 
-    let roundCorrente = 0;
+    // ultima chiusura di round per giocatore (Aggiudicazione/Sorteggio/NonVenduto) con il
+    // SUO roundId vero: i reinserimenti (tutti-passano, annulli) fanno chiamare un
+    // giocatore due volte e il numero di riga NON coincide col round — il round vero
+    // arriva dagli eventi, non dal conteggio delle righe (fix 08/09/2026)
+    const chiusura = new Map();
+    const chiamatePer = new Map();
+    for (const ev of stato.eventi) {
+      if (ev.tipo === "Aggiudicazione" || ev.tipo === "Sorteggio" || ev.tipo === "NonVenduto") {
+        chiusura.set(ev.idGiocatore, ev);
+        if (!chiamatePer.has(ev.idGiocatore)) chiamatePer.set(ev.idGiocatore, new Set());
+        chiamatePer.get(ev.idGiocatore).add(ev.roundId);
+      }
+    }
+
     let alt = false;
     for (const g of stato.lista) {
-      roundCorrente++;
       const agg = aggiudicazioni.get(g.id);
-      const offerte = offertePerRound.get(roundCorrente) || [];
+      const roundVero = chiusura.has(g.id) ? chiusura.get(g.id).roundId : null;
+      const offerte = roundVero != null ? (offertePerRound.get(roundVero) || []) : [];
       const valide = offerte.filter(o => o.importo > 0).sort((a, b) => a.importo - b.importo);
       const passi = offerte.filter(o => o.importo === 0);
       const nomeVincitore = agg ? nomeDi(agg.idPartecipante) : "";
@@ -405,10 +418,11 @@ function generaXlsx(stato) {
       if (annullati.has(g.id)) nota = nonVendutiSet.has(g.id) ? "ANNULLATO → SVINCOLATO" : "ANNULLATO";
       else if (!agg && nonVendutiSet.has(g.id)) nota = "SVINCOLATO";
       if (agg && stato.eventi.some(e => e.tipo === "Sorteggio" && e.idGiocatore === g.id)) nota = "SORTEGGIO";
+      if (chiamatePer.get(g.id) && chiamatePer.get(g.id).size > 1) nota = (nota ? nota + " · " : "") + "RICHIAMATO";
 
       const isWinner = !!agg;
       righe.push([
-        { v: roundCorrente, s: alt ? 17 : 17 },
+        { v: roundVero != null ? roundVero : "", s: alt ? 17 : 17 },
         { v: g.nome, s: isWinner ? 11 : (alt ? 2 : 0) },
         { v: g.ruolo, s: { P: 5, D: 6, C: 7, A: 8 }[g.ruolo] || 0 },
         { v: g.squadra || "", s: alt ? 2 : 0 },

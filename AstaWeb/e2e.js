@@ -207,15 +207,17 @@ const ok = (msg) => { CHECK++; console.log("OK " + msg); };
     assert(tts.presente, "speechSynthesis presente");
     ok("TTS presente nel browser (voci italiane subito disponibili: " + tts.voci + "; su Chrome si caricano a caldo)");
 
-    // ------------------------------------------------ Retegui: forza chiusura senza buste → non venduto
+    // ------------------------------------------------ Retegui: forza chiusura senza buste → tutti passano (reinserito)
     await pagA.click('[data-azione="prossimo"]');
     await pagA.waitForFunction(() => document.body.innerText.includes("Retegui"), { timeout: 8000 });
     await pagA.click('[data-azione="forza"]');
     await pagA.waitForFunction(() => document.body.innerText.includes("Non venduto"), { timeout: 8000 });
     let tA2 = (await testo(pagA)).replace(/\s+/g, " ");
     assert(tA2.includes("nessuna offerta"), "motivo «nessuna offerta» mostrato");
-    assert(tA2.slice(tA2.indexOf("Annuncio:")).includes("Nessuna offerta"), "l'annuncio dice «Nessuna offerta»");
-    ok("forza chiusura: Retegui non venduto, annuncio coerente col motivo");
+    const annRet = tA2.slice(tA2.indexOf("Annuncio:"));
+    assert(annRet.includes("Hanno passato tutti"), "l'annuncio dice che hanno passato tutti: " + annRet.slice(0, 200));
+    assert(annRet.includes("torna in coda"), "prima volta: annuncia il richiamo a fine reparto");
+    ok("forza chiusura: Retegui non venduto, voce «hanno passato tutti, torna in coda»");
     await pagA.click('[data-azione="prossimo"]');
     await pagA.waitForFunction(() => document.body.innerText.includes("Kean"), { timeout: 8000 });
     ok("avanzamento a Kean");

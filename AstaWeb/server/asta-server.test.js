@@ -21,6 +21,7 @@ const {
   MotoreAsta, ParserLista, ParserXlsx, testoAnnuncio, esportaCsvDaStato,
   creaServer, parseIntero, grigliaDaCsv, unzip,
 } = require("./asta-server.js");
+const { generaXlsx } = require("./esporta-xlsx.js");
 
 // ------------------------------------------------------------------ helpers
 
@@ -189,6 +190,26 @@ test("annullaAssegnazione: QUALSIASI assegnazione, in qualsiasi momento", () => 
   assert.strictEqual(m.annullaAssegnazione(idPrimo).ok, false, "già annullato: non più assegnato");
   // l'evento è nella storia (l'Excel lo rispetta)
   assert.ok(m.stato.eventi.some((e) => e.tipo === "AnnullamentoAggiudicazione" && e.idGiocatore === idPrimo));
+});
+
+test("non venduto per tutti-passano: rivelazione provvisoria al primo giro, definitiva al richiamo", () => {
+  const m = new MotoreAsta();
+  m.avvia(cfgStd(), parts8(), listaStd());
+  // tutti passano sul primo giocatore: reinserito in coda dopo l'altro attaccante
+  for (let i = 1; i <= 8; i++) m.offri(i, 0);
+  assert.strictEqual(m.stato.rivelazione.provvisorio, true, "primo giro deve essere provvisorio");
+  assert.ok(m.stato.coda.includes(0), "giocatore reinserito in coda");
+  assert.ok(m.stato.rivelazione.annuncio.includes("torna in coda"), "voce: torna in coda");
+  m.prossimo(); // Attaccante Due
+  assert.strictEqual(m.corrente.nome, "Attaccante Due");
+  m.offri(1, 10);
+  for (let i = 2; i <= 8; i++) m.offri(i, 0);
+  m.prossimo(); // RICHIAMO di Attaccante Uno (era reinserito dopo l'ultimo A in coda)
+  assert.strictEqual(m.corrente.nome, "Attaccante Uno", "il richiamo arriva col suo round vero");
+  for (let i = 1; i <= 8; i++) m.offri(i, 0);
+  assert.strictEqual(m.stato.rivelazione.provvisorio, false, "secondo giro: definitivo");
+  assert.ok(m.stato.rivelazione.annuncio.includes("resta svincolato"), "voce: resta svincolato");
+  assert.ok(m.stato.nonVenduti.includes(0), "ora è svincolato per davvero");
 });
 
 test("annullaAssegnazione del round appena rivelato: rifà il round da capo", () => {
@@ -880,6 +901,62 @@ test("server: export Excel multi-foglio — 5 fogli e contenuti verificati in le
 });
 
 function piattaCsv(s) { return s.toLowerCase(); }
+
+test("server: vista partecipante espone 'annullati' (per chi legge da programma)", async () => {
+  const dirTmp = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "astaweb-"));
+  const server = creaServer({ dirDati: dirTmp });
+  const porta = await ascolta(server);
+  const pin = server.sessione.pin;
+  try {
+    for (const nome of ["Alfa", "Beta"]) await chiama(porta, "/api/entra", "POST", JSON.stringify({ nome }));
+    await chiama(porta, "/api/lista", "POST", Buffer.from(csvDemo), { "x-pin": pin });
+    await chiama(porta, "/api/avvia", "POST", JSON.stringify({ pin }));
+    const tA = (await chiama(porta, "/api/entra", "POST", JSON.stringify({ nome: "Alfa" }))).json.token;
+    await chiama(porta, "/api/offerta", "POST", JSON.stringify({ pid: 1, token: tA, importo: 40 }));
+    await chiama(porta, "/api/azione", "POST", JSON.stringify({ pin, azione: "forza" }));
+    let v = await primaVistaSse(porta, "pid=1");
+    assert.deepStrictEqual(v.annullati, [], "nessun annullato all'inizio");
+    // il banditore annulla l'assegnazione del giocatore corrente (G3, primo attaccante, id 3)
+    await chiama(porta, "/api/azione", "POST", JSON.stringify({ pin, azione: "annullaAssegnazione", idGiocatore: 3 }));
+    v = await primaVistaSse(porta, "pid=1");
+    assert.strictEqual(v.annullati.length, 1, "un annullato");
+    assert.strictEqual(v.annullati[0].idGiocatore, 3);
+    assert.strictEqual(v.annullati[0].idPartecipante, 1);
+    assert.strictEqual(v.annullati[0].importo, 40);
+    assert.ok(Number.isInteger(v.annullati[0].ts), "ts presente");
+    // riassegnato (stesso giocatore, stessa persona): l'annullamento sparisce
+    await chiama(porta, "/api/offerta", "POST", JSON.stringify({ pid: 1, token: tA, importo: 35 }));
+    await chiama(porta, "/api/azione", "POST", JSON.stringify({ pin, azione: "forza" }));
+    v = await primaVistaSse(porta, "pid=1");
+    assert.deepStrictEqual(v.annullati, [], "riasegnato: non più in annullati");
+  } finally {
+    if (server.closeAllConnections) server.closeAllConnections();
+    await new Promise((ok) => server.close(ok));
+    fs.rmSync(dirTmp, { recursive: true, force: true });
+  }
+});
+
+test("Excel 'Asta completa': round VERI da eventi con giocatore richiamato (fix 08/09)", () => {
+  // 2 attaccanti: tutti passano su A1 (reinserito dopo A2), A2 venduto a P1 per 10,
+  // poi A1 richiamato (round 3) e venduto a P1 per 5: nel foglio A1 deve avere
+  // round 3 con le offerte del round 3 (prima il round 3 spariva del tutto)
+  const m = new MotoreAsta();
+  m.avvia({ budgetIniziale: 500, quote: { P: 1, D: 1, C: 1, A: 2 } },
+    [{ id: 1, nome: "P1" }, { id: 2, nome: "P2" }],
+    [{ id: 0, nome: "A1", ruolo: "A", quotazioneBase: 20, squadra: "Roma" },
+     { id: 1, nome: "A2", ruolo: "A", quotazioneBase: 20, squadra: "Lazio" }]);
+  m.offri(1, 0); m.offri(2, 0);                       // round 1: tutti passano → A1 reinserito
+  m.prossimo();                                        // round 2: A2
+  m.offri(1, 10); m.offri(2, 3);                       // P1 compra A2 a 10
+  m.prossimo();                                        // round 3: RICHIAMO di A1
+  assert.strictEqual(m.corrente.nome, "A1");
+  m.offri(1, 5); m.offri(2, 2);                        // P1 compra A1 a 5 (quota A=2: ancora idoneo)
+  assert.strictEqual(m.stato.fase, "RIVELAZIONE");
+  const s3 = unzip(generaXlsx(m.stato))["xl/worksheets/sheet3.xml"].toString("utf8");
+  assert.ok(s3.includes("RICHIAMATO"), "nota RICHIAMATO assente");
+  assert.ok(s3.includes("P2: 2, P1: 5"), "offerte del round 3 (richiamo) mancanti");
+  assert.ok(/<v>3<\/v>/.test(s3), "round 3 mancante nel foglio");
+});
 
 test("server: evento singolo ?uno=1 — una vista e risposta CHIUSA (polling dietro proxy che bufferizza lo streaming)", async () => {
   const dirTmp = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "astaweb-"));
