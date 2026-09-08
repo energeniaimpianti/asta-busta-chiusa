@@ -1136,7 +1136,7 @@ test("server: «Nuova asta» ripristina anche le regole default (config residua 
     assert.strictEqual((await chiama(porta, "/api/nuova", "POST", JSON.stringify({ pin }))).stato, 200);
     const v = await primaVistaSse(porta, "pin=" + pin);
     assert.strictEqual(v.config.baseComeMinimo, false, "baseComeMinimo tornato default dopo nuova");
-    assert.strictEqual(v.config.budgetIniziale, 500, "budget tornato default");
+    assert.strictEqual(v.config.budgetIniziale, 1500, "budget tornato default (1500, regola 08/09)");
     assert.deepStrictEqual(v.partecipantiRegistrati, [], "iscritti azzerati");
   } finally {
     if (server.closeAllConnections) server.closeAllConnections();
