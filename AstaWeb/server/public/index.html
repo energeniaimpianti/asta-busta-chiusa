@@ -230,6 +230,7 @@ function intestazione() {
       <div>
         <span style="font-weight:700;font-size:14px;">${esc(vista.mioNome || "")}</span>
         <span class="budget-big" style="color:${budgetCol};margin-left:12px;">💰 ${vista.budgetResiduo} FMM</span>
+        <a href="#" id="cambia-persona" style="margin-left:10px;font-size:11px;color:#8fa898;text-decoration:underline;" title="Questo telefono ricorda l'ultima iscrizione: tocca qui per presentarti con un altro nome">non sei tu?</a>
       </div>
       <div>${slots}</div>
     </div>
@@ -456,8 +457,15 @@ function schermataFine() {
 // ------------------------------------------------------------------ eventi
 
 document.addEventListener("click", async (e) => {
-  const t = e.target.closest("button");
+  const t = e.target.closest("button, a");
   if (!t) return;
+  if (t.id === "cambia-persona") {
+    // il telefono ricorda l'ultima iscrizione (localStorage): chi si ritrova col nome
+    // di un altro (dispositivo prestato, pc del banditore) puo' ripresentarsi
+    ["asta_pid", "asta_token", "asta_nome"].forEach((k) => localStorage.removeItem(k));
+    location.reload();
+    return;
+  }
   if (t.id === "vai") {
     const nome = document.getElementById("nome").value.trim();
     if (nome.length < 2) { toast("Scrivi il tuo nome (almeno 2 lettere)"); return; }

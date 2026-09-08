@@ -135,7 +135,9 @@ const ok = (msg) => { CHECK++; console.log("OK " + msg); };
     assert(tB.includes("Quotazione minima"), "quotazione minima visibile anche al partecipante (sotto il nome)");
     assert(tB.includes("Inter"), "squadra di appartenenza visibile sotto il nome");
     assert(tB.includes("Attaccante"), "ruolo visibile al partecipante");
-    ok("partecipante: nome, squadra, ruolo e quotazione minima");
+    // il telefono ricorda l'iscrizione (rientro automatico): deve esserci il modo di uscire
+    assert(tB.includes("non sei tu?"), "link cambia-persona presente nell'header del partecipante");
+    ok("partecipante: nome, squadra, ruolo, quotazione minima + link «non sei tu?»");
     await pagB.screenshot({ path: "../.tools/e2e_partecipante_asta.png" });
 
     // busta di Giovanni: 44 (il click-logger diagnostico resta: se un giorno il
