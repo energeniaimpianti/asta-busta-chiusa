@@ -104,6 +104,8 @@ class MotoreAsta {
       offerteRoundPrincipale: {},
       ultimoSpareggio: {},
       spareggi: 0,
+      ultimoPareggio: 0,      // importo dell'ultimo pareggio (serve al conteggio delle ripetizioni)
+      ripetizioniPareggio: 0, // quante volte CONSECUTIVE si è pareggiato con lo stesso importo
       squadre,
       nonVenduti: [],
       reinsertioni: {},
@@ -279,19 +281,23 @@ class MotoreAsta {
         s.ultimoSpareggio = {};
         s.offerte = {};
         s.spareggi = 1;
+        s.ultimoPareggio = maxV;      // il pareggio principale è la prima "puntata uguale"
+        s.ripetizioniPareggio = 1;
       }
     } else if (s.fase === FASI.SPAREGGIO) {
-      // SPAREGGI A DUE GIRI (regola definitiva 08/09): nel primo e nel secondo spareggio
-      // si può RIPETERE la propria puntata; se anche il secondo finisce in parità,
-      // solo allora la MONETINA assegna il giocatore
+      // SPAREGGIO AD OLTRANZA (regola definitiva 08/09 notte): la MONETINA arriva solo
+      // dopo il SECONDO pareggio consecutivo CON LO STESSO importo; se i pari alzano
+      // ogni volta (70-70, 71-71, 72-72…) si continua finché uno vince o ripetono due volte
       const maxV = Math.max(...Object.values(s.offerte));
       const vincenti = Object.entries(s.offerte).filter(([, v]) => v === maxV).map(([k]) => Number(k));
       if (vincenti.length === 1) {
         this._aggiudica(g, vincenti[0], maxV, s.offerteRoundPrincipale, { ...s.offerte });
-      } else if (s.spareggi >= 2) {
-        this._sorteggia(g, vincenti, maxV);
       } else {
-        this._apriSpareggioSuccessivo(g, vincenti);
+        if (maxV === s.ultimoPareggio) s.ripetizioniPareggio = (s.ripetizioniPareggio || 0) + 1;
+        else s.ripetizioniPareggio = 1;
+        s.ultimoPareggio = maxV;
+        if (s.ripetizioniPareggio >= 2) this._sorteggia(g, vincenti, maxV);
+        else this._apriSpareggioSuccessivo(g, vincenti);
       }
     }
   }

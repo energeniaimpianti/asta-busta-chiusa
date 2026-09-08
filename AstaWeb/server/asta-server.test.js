@@ -127,39 +127,71 @@ test("pareggio apre spareggio: no ritiro, min=propria offerta", () => {
   assert.strictEqual(m.stato.squadre[5].budgetResiduo, 475);
 });
 
-test("spareggio a DUE GIRI (regola 08/09): la stessa puntata si può ripetere due volte, poi la monetina", () => {
+test("spareggio AD OLTRANZA (regola 08/09 notte): monetina SOLO dopo due pareggi consecutivi con lo STESSO importo", () => {
   const m = new MotoreAsta();
   m.avvia(cfgStd(), parts8(), listaStd());
   m.offri(1, 20); m.offri(2, 20);
   for (let i = 3; i <= 8; i++) m.offri(i, 0);
   assert.strictEqual(m.stato.fase, "SPAREGGIO");
-  assert.strictEqual(m.stato.spareggi, 1);
-  // PRIMO spareggio: ripetere la stessa puntata è consentito
-  m.offri(1, 20); m.offri(2, 20);
-  assert.strictEqual(m.stato.fase, "SPAREGGIO", "primo pareggio → SECONDO spareggio, non monetina");
-  assert.strictEqual(m.stato.spareggi, 2);
-  assert.strictEqual(m.corrente.nome, "Attaccante Uno");
-  // SECONDO spareggio: di nuovo si può ripetere; il minimo è la propria puntata del primo
-  assert.strictEqual(m.offri(1, 19).ok, false, "sotto la propria del primo spareggio: rifiutato");
   assert.strictEqual(m.offri(1, 0).ok, false, "zero mai ammesso nello spareggio");
+  // SECONDO pareggio con la STESSA puntata (20-20 ripetuto) → MONETINA subito
   m.offri(1, 20); m.offri(2, 20);
   const r = m.stato.rivelazione;
-  assert.strictEqual(m.stato.fase, "RIVELAZIONE", "secondo pareggio → MONETINA");
+  assert.strictEqual(m.stato.fase, "RIVELAZIONE");
   assert.strictEqual(r.sorteggiato, true);
   assert.strictEqual(r.importoFinale, 20);
   assert.ok(r.vincitore === "P1" || r.vincitore === "P2");
-  const t = testoAnnuncio(r);
-  assert.ok(t.includes("sorteggiato"), "annuncio deve dire sorteggiato");
+  const vincitoreId = r.idVincitore;
+  assert.strictEqual(m.stato.squadre[vincitoreId].rosa.length, 1);
+  assert.strictEqual(m.stato.squadre[vincitoreId].budgetResiduo, 480);
+  assert.ok(testoAnnuncio(r).includes("sorteggiato"), "annuncio deve dire sorteggiato");
 });
 
-test("spareggio: salita pari al primo giro apre il secondo; il secondo con vincitore aggiudica", () => {
+test("spareggio: se SALGONO pareggiando si va ad oltranza (70-70, 71-71, 72-72…), monetina solo ripetendo due volte lo stesso valore", () => {
+  const m = new MotoreAsta();
+  m.avvia(cfgStd(), parts8(), listaStd());
+  m.offri(1, 70); m.offri(2, 70);
+  for (let i = 3; i <= 8; i++) m.offri(i, 0);
+  assert.strictEqual(m.stato.spareggi, 1);
+  // S1: alzano e pareggiano (71-71) → si prosegue, NON monetina
+  m.offri(1, 71); m.offri(2, 71);
+  assert.strictEqual(m.stato.fase, "SPAREGGIO", "pareggio salendo NON deve sorteggiare");
+  assert.strictEqual(m.stato.spareggi, 2);
+  // S2: alzano ancora (72-72) → si prosegue ad oltranza
+  m.offri(1, 72); m.offri(2, 72);
+  assert.strictEqual(m.stato.fase, "SPAREGGIO", "secondo pareggio salendo NON deve sorteggiare");
+  assert.strictEqual(m.stato.spareggi, 3);
+  // il minimo di ogni giro è la propria ultima puntata: sotto è rifiutato
+  assert.strictEqual(m.offri(1, 71).ok, false, "sotto la propria del giro precedente: rifiutato");
+  // S3: ripetono lo stesso 72 → SECONDA ripetizione consecutiva → MONETINA
+  m.offri(1, 72); m.offri(2, 72);
+  const r = m.stato.rivelazione;
+  assert.strictEqual(m.stato.fase, "RIVELAZIONE");
+  assert.strictEqual(r.sorteggiato, true);
+  assert.strictEqual(r.importoFinale, 72);
+  assert.ok(r.vincitore === "P1" || r.vincitore === "P2");
+});
+
+test("spareggio: due pareggi consecutivi allo stesso valore DOPO una salita → monetina (25-25, poi di nuovo 25-25)", () => {
   const m = new MotoreAsta();
   m.avvia(cfgStd(), parts8(), listaStd());
   m.offri(1, 20); m.offri(2, 20);
   for (let i = 3; i <= 8; i++) m.offri(i, 0);
-  m.offri(1, 25); m.offri(2, 25);              // pari SALITI: apre il secondo giro
-  assert.strictEqual(m.stato.spareggi, 2);
-  m.offri(1, 30); m.offri(2, 28);              // secondo giro con vincitore
+  m.offri(1, 25); m.offri(2, 25);              // S1 salendo pari: si prosegue
+  assert.strictEqual(m.stato.fase, "SPAREGGIO");
+  m.offri(1, 25); m.offri(2, 25);              // S2 RIPETONO 25: seconda volta consecutiva a 25
+  const r = m.stato.rivelazione;
+  assert.strictEqual(r.sorteggiato, true);
+  assert.strictEqual(r.importoFinale, 25);
+});
+
+test("spareggio: giro con vincitore aggiudica (saliti 30-28 al secondo giro)", () => {
+  const m = new MotoreAsta();
+  m.avvia(cfgStd(), parts8(), listaStd());
+  m.offri(1, 20); m.offri(2, 20);
+  for (let i = 3; i <= 8; i++) m.offri(i, 0);
+  m.offri(1, 25); m.offri(2, 25);
+  m.offri(1, 30); m.offri(2, 28);
   const r = m.stato.rivelazione;
   assert.strictEqual(r.vincitore, "P1");
   assert.strictEqual(r.importoFinale, 30);

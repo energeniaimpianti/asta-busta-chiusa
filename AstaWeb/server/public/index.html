@@ -281,11 +281,10 @@ function pannelloAsta() {
   </div>`;
 
   if (inSpareggio) {
-    const ultimoGiro = (vista.spareggio.giri || 1) >= 2;
     html += `<div class="card" style="background:#33290f">
-      <b>⚖ Spareggio${vista.spareggio.candidato ? "" : " (non ti riguarda)"}${ultimoGiro ? " — secondo e ultimo giro" : ""}</b> al pari di ${vista.spareggio.pari} FMM.<br>
+      <b>⚖ Spareggio${vista.spareggio.candidato ? "" : " (non ti riguarda)"}</b> al pari di ${vista.spareggio.pari} FMM.<br>
       <span class="muto">${vista.spareggio.candidato
-        ? "Consegna una nuova busta: puoi <b>ripetere i tuoi " + vista.spareggio.min + " FMM</b> o puntare più alto. Non ci si ritira" + (ultimoGiro ? ": un altro pareggio qui decide la monetina." : ".")
+        ? "Consegna una nuova busta: puoi <b>ripetere i tuoi " + vista.spareggio.min + " FMM</b> o puntare più alto (non ci si ritira). Se il pareggio si ripete con la STESSA puntata per la seconda volta, decide la monetina: se alzano, si ripete."
         : "Aspetta l'esito: chi era in parità rilancia."}</span>
     </div>`;
   }
