@@ -519,6 +519,7 @@ function generaXlsxOfferte(stato) {
   // aggiudicazione successiva rimette — stessa regola del foglio Asta completa)
   const aggiudicazioni = new Map();
   const annullati = new Set();
+  const annullamentoTs = new Map(); // giocatore -> ts dell'ULTIMO annullamento
   for (const ev of stato.eventi) {
     if (ev.tipo === "Aggiudicazione" || ev.tipo === "Sorteggio" || ev.tipo === "AssegnazioneManuale") {
       aggiudicazioni.set(ev.idGiocatore, ev);
@@ -527,8 +528,13 @@ function generaXlsxOfferte(stato) {
     if (ev.tipo === "AnnullamentoAggiudicazione") {
       aggiudicazioni.delete(ev.idGiocatore);
       annullati.add(ev.idGiocatore);
+      annullamentoTs.set(ev.idGiocatore, ev.ts || 0);
     }
   }
+  // speso REALE: le aggiudicazioni valide (sorteggi e assegnazioni manuali
+  // compresi, anche se non hanno riga di busta) — non la somma delle righe
+  // vincenti, che in un round RIAPERTO da un annullamento conterebbe doppio
+  const spesoAggiudicazioni = [...aggiudicazioni.values()].reduce((a, ev) => a + (ev.importo || 0), 0);
 
   // round -> giocatore (dalla chiusura del round) e round -> offerte
   const chiusura = new Map();
@@ -552,7 +558,7 @@ function generaXlsxOfferte(stato) {
     { v: "Offerta", s: 1 }, { v: "Fase", s: 1 }, { v: "Esito", s: 1 },
   ]);
 
-  let nOfferte = 0, spesoTot = 0;
+  let nOfferte = 0;
   let blocco = 0;
   for (const roundId of [...perRound.keys()].sort((a, b) => a - b)) {
     const chiuso = chiusura.get(roundId);
@@ -562,11 +568,36 @@ function generaXlsxOfferte(stato) {
     const agg = aggiudicazioni.get(g.id);
     const base = blocco % 2 === 0 ? 0 : 2; // bande alternate per BLOCCO, non per riga
     const ordinate = [...perRound.get(roundId)].sort((a, b) => (b.importo - a.importo) || nomeDi(a.idPartecipante).localeCompare(nomeDi(b.idPartecipante)));
-    for (const o of ordinate) {
+    // busta che CHIUDE l'eventuale aggiudicazione: l'ULTIMA del vincitore col
+    // prezzo pagato — in un round riaperto da un annullamento le buste del
+    // primo passaggio restano nel blocco ma non sono più quelle vincenti
+    let rigaVincente = -1;
+    if (agg && agg.roundId === roundId) {
+      for (let i = 0; i < ordinate.length; i++) {
+        const o = ordinate[i];
+        if (o.idPartecipante === agg.idPartecipante && o.importo === agg.importo) rigaVincente = i;
+      }
+    }
+    // PRIMO passaggio di un round riaperto: la busta che aveva VINTO e poi è
+    // stata annullata è la più alta tra quelle precedenti all'annullamento
+    const tsAnnBlocco = annullamentoTs.get(g.id) || 0;
+    const primaPassata = tsAnnBlocco ? ordinate.filter((o) => o.ts <= tsAnnBlocco) : [];
+    const maxPrimaPassata = primaPassata.length ? Math.max(...primaPassata.map((o) => o.importo)) : -1;
+    for (let i = 0; i < ordinate.length; i++) {
+      const o = ordinate[i];
       nOfferte++;
       const passo = o.importo === 0;
-      const vinta = !passo && agg && agg.idPartecipante === o.idPartecipante;
-      if (vinta) spesoTot += o.importo;
+      const vinta = i === rigaVincente;
+      let esito;
+      if (passo) esito = "passo";
+      else if (vinta) esito = "AGGIUDICATA";
+      else if (tsAnnBlocco && o.ts <= tsAnnBlocco) {
+        esito = o.importo === maxPrimaPassata ? "annullata" : "persa";
+      } else if (agg && o.idPartecipante === agg.idPartecipante) {
+        // busta del vincitore NON decisiva nel passaggio valido: il pari che
+        // ha portato allo spareggio
+        esito = "in spareggio";
+      } else esito = "persa";
       const fase = o.giro != null ? (o.giro === 0 ? "Asta" : "Spareggio " + o.giro) : (o.spareggio ? "Spareggio" : "Asta");
       righe.push([
         { v: roundId, s: 17 },
@@ -577,13 +608,13 @@ function generaXlsxOfferte(stato) {
         { v: nomeDi(o.idPartecipante), s: vinta ? 11 : base },
         { v: o.importo, s: passo ? 16 : (base === 2 ? 4 : 3) },
         { v: fase, s: base },
-        { v: passo ? "passo" : vinta ? "AGGIUDICATA" : "persa", s: passo ? 16 : (vinta ? 11 : base) },
+        { v: esito, s: passo ? 16 : (vinta ? 11 : base) },
       ]);
     }
     blocco++;
   }
   righe.push([]);
-  righe.push([{ v: "TOTALE", s: 10 }, { v: `${nOfferte} buste`, s: 10 }, { v: "", s: 0 }, { v: "", s: 0 }, { v: "", s: 0 }, { v: "", s: 0 }, { v: "", s: 0 }, { v: "", s: 0 }, { v: `speso ${spesoTot} FMM`, s: 10 }]);
+  righe.push([{ v: "TOTALE", s: 10 }, { v: `${nOfferte} buste`, s: 10 }, { v: "", s: 0 }, { v: "", s: 0 }, { v: "", s: 0 }, { v: "", s: 0 }, { v: "", s: 0 }, { v: "", s: 0 }, { v: `speso ${spesoAggiudicazioni} FMM`, s: 10 }]);
   x.aggiungiFoglio("Offerte", righe, [8, 22, 7, 16, 10, 18, 10, 13, 14]);
   return x.genera();
 }

@@ -1442,3 +1442,22 @@ test("/api/liberi: giocatori non assegnati per reparto, senza il corrente e senz
     fs.rmSync(dirTmp, { recursive: true, force: true });
   }
 });
+
+test("generaXlsxOfferte: round RIAPERTO da annullamento — una sola AGGIUDICATA, prima busta «annullata», speso reale", () => {
+  const m = new MotoreAsta();
+  m.avvia(cfgStd(), parts8(), listaStd());
+  // primo passaggio: P2 vince per 30, poi il banditore annulla e il round si rifà
+  m.offri(2, 30); m.offri(5, 20);
+  for (const i of [1, 3, 4, 6, 7, 8]) m.offri(i, 0);
+  assert.strictEqual(m.stato.rivelazione.vincitore, "P2");
+  assert.strictEqual(m.annullaUltimaAggiudicazione().ok, true);
+  // secondo passaggio dello STESSO round: P2 vince per 25
+  m.offri(2, 25); m.offri(5, 22);
+  for (const i of [1, 3, 4, 6, 7, 8]) m.offri(i, 0);
+  const { generaXlsxOfferte } = require("./esporta-xlsx.js");
+  const xml = unzip(generaXlsxOfferte(m.stato))["xl/worksheets/sheet1.xml"].toString("utf8");
+  assert.strictEqual((xml.match(/>AGGIUDICATA</g) || []).length, 1, "una sola AGGIUDICATA nel round riaperto");
+  assert.ok(xml.includes("annullata"), "la busta del primo passaggio è marcata «annullata»");
+  assert.ok(!/>speso 55 FMM</.test(xml), "niente doppio conteggio (30+25)");
+  assert.ok(/>speso 25 FMM</.test(xml), "speso = solo l'aggiudicazione valida");
+});
