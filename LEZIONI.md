@@ -168,3 +168,19 @@ Nuove lezioni si AGGIUNGONO in fondo, mai si cancellano.
 - **REGOLA**: ogni "cancella/ricomincia" deve tornare davvero allo stato iniziale (config
   compresa); ogni test end-to-end dichiara le proprie precondizioni invece di ereditarle;
   e i catch vuoti su funzionalità visibili all'utente (QR) meritano almeno un log.
+
+## 18 · Disco di rete/antivirus: rename atomico EPERM + handler async che lascia appese le richieste
+
+- **Sintomo** (10/09): durante l'E2E sul repo in `V:\` il server loggava
+  `EPERM ... rename stato.json.tmp -> stato.json` come `[uncaught]` e il test moriva con
+  "fetch failed" a metà serata, senza errori nella pagina.
+- **Causa (doppia)**: (1) il rename su file esistente può fallire TRANSITORIAMENTE su
+  dischi di rete/antivirus (V: è un'unità di rete); (2) `gestisci` è `async` ma il
+  try/catch del createServer era sincrono: qualunque throw DOPO una `await` diventava
+  unhandledRejection e la richiesta HTTP restava appesa (il client vede "fetch failed",
+  non un 500).
+- **REGOLA**: il rename "atomico" su Windows vuole una cascata di ripristino
+  (rename → unlink+rename → pausa e riprova → copia → scrittura diretta):
+  `scriviConRinforzo()` in asta-server.js. E OGNI handler http con funzione async va
+  chiamato con `await` dentro il try/catch, altrimenti gli errori non arrivano al client
+  e non si vedono nei log della richiesta.

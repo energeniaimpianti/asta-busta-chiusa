@@ -1,7 +1,8 @@
-# SPEC — Asta Fantacalcio "Busta Chiusa" (8 partecipanti + 1 banditore)
+# SPEC — FantAsta · Asta Realtime (busta chiusa, 8 partecipanti + 1 banditore)
 
 Redatta il 26/08/2026 — versione 1.0. Ogni regola non dettata da Giovanni è risolta con un
 **default esplicito** (sempre configurabile nella schermata di setup) qui motivato.
+Nome definitivo dell'app: **FantAsta — Asta Realtime** (10/09/2026).
 
 ## 1. Regole fissate da Giovanni (vincolanti)
 
@@ -40,6 +41,13 @@ Redatta il 26/08/2026 — versione 1.0. Ogni regola non dettata da Giovanni è r
 | D10 | Esportazione | **Excel 5 fogli** (Squadre, Riepilogo, Asta completa con annullamenti tracciati, Analisi, Svincolati) + CSV rose | richiesta "Excel ben formattato, dati strategici" |
 | D11 | Crediti | il banditore può **modificare i crediti di qualunque partecipante in qualsiasi momento** (pannello "Regie", anche a fine asta prima dell'Excel) | correzioni e regali della lega (07/09/2026) |
 | D12 | Squadra di appartenenza | colonna **opzionale** del file lista (header "Squadra/Team/Club" o quarta colonna posizionale): mostrata sotto il nome del giocatore e nell'Excel finale; liste vecchie a 3 colonne restano valide (07/09/2026) | richiesta "indica anche la squadra di appartenenza" |
+| D13 | Battute del banditore | **una su cinque** aste; per i giocatori costosi (≥25 FMM) circa una su due; interruttore «Battute 🎭» nella barra voce (vale per tutta la serata, spenge solo i commenti: risultato e suspense restano interi) | feed-back del 10/09: troppe e ripetitive |
+| D14 | Sospense della rivelazione | le buste si aprono in ordine crescente e le **ultime due rallentano insieme** (~2,6 s l'una): rallentare solo la più alta svelerebbe il vincitore per esclusione; crediti e rose si aggiornano solo DOPO la proclamazione visiva (viste «sospese» durante la rivelazione) | feed-back del 10/09: la vera suspance è lì |
+| D15 | Chiusura del reparto | tasto **«Chiudi {reparto}»** del banditore: i giocatori rimasti (corrente compreso se il round è aperto, con buste cestinate sigillate) restano svincolati e si passa al reparto successivo; in più i giocatori con nessun idoneo si svincolano in silenzio, senza «rivelazioni» inutili | feed-back del 10/09: scorrere i rimanenti a fine reparto è inutile |
+| D16 | Blackout | autosave già a ogni mossa; da subito snapshot scritto in modo **atomico** (tmp+fsync+rename con ripristino dal penultimo `.bak` se il file resta monco) | richiesta del 10/09 |
+| D17 | File offerte | oltre all'Excel 5 fogli: **asta_offerte.xlsx** con ogni busta di ogni giocatore (round, fase asta/spareggio, esito) ordinato per round e, dentro il round, dall'offerta più alta | richiesta del 10/09 |
+| D18 | Giocatori liberi | pannello **«Ancora liberi»** per partecipanti e banditore: reparto per reparto chi è in coda (con quotazione) e chi è svincolato; i nomi si scaricano solo quando il pannello è aperto | richiesta del 10/09 |
+| D19 | Layout puntate | «Passo» e «Consegna busta» SOPRA la tastiera del telefono: nome giocatore + tasto Passo nella stessa schermata; i menu a tendina restano aperti/chiusi come li lascia l'utente (nessun timer); nelle rose compaiono i crediti spesi per reparto | feed-back del 10/09 |
 
 ## 3. Casi limite gestiti (rigore)
 

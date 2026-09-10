@@ -18,7 +18,7 @@ if errorlevel 1 (
 )
 
 echo ============================================================
-echo   ASTA BUSTA CHIUSA - con partecipante remoto
+echo   FANTASTA ASTA REALTIME - con partecipante remoto
 echo ============================================================
 echo.
 echo   Avvio il server...

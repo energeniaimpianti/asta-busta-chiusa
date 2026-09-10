@@ -1179,12 +1179,263 @@ test("server: pagina partecipante e banditore servite, vendor QR presente", asyn
   try {
     const home = await chiama(porta, "/");
     assert.strictEqual(home.stato, 200);
-    assert.ok(home.testo.includes("Asta Busta Chiusa"));
+    assert.ok(home.testo.includes("FantAsta"), "il nome FantAsta nella pagina partecipante");
     const band = await chiama(porta, "/banditore");
     assert.strictEqual(band.stato, 200);
     assert.ok(band.testo.includes("Banditore"));
     const qr = await chiama(porta, "/vendor/qrcode.min.js");
     assert.strictEqual(qr.stato, 200);
+  } finally {
+    if (server.closeAllConnections) server.closeAllConnections();
+    await new Promise((ok) => server.close(ok));
+    fs.rmSync(dirTmp, { recursive: true, force: true });
+  }
+});
+
+
+// ============================================================== NOVITÀ 10/09
+// chiudiReparto, scarto silenzioso, vista sospesa in rivelazione, battute,
+// persistenza anti-blackout, export offerte, liberi per reparto
+
+test("chiudiReparto: svincola il reparto (corrente aperto compreso) e salta al successivo", () => {
+  const m = new MotoreAsta();
+  m.avvia(cfgStd({ quote: { P: 1, D: 1, C: 1, A: 2 } }), parts8(), [
+    { id: 0, nome: "A1", ruolo: "A", quotazioneBase: 20 },
+    { id: 1, nome: "A2", ruolo: "A", quotazioneBase: 20 },
+    { id: 2, nome: "C1", ruolo: "C", quotazioneBase: 20 },
+  ]);
+  // round APERTO con buste già consegnate: la chiusura del reparto le cestina sigillate
+  m.offri(1, 15);
+  m.offri(2, 30);
+  const esito = m.chiudiReparto();
+  assert.strictEqual(esito.ok, true);
+  assert.strictEqual(esito.ruolo, "A");
+  assert.strictEqual(esito.giocatori, 2, "il corrente A1 + A2 in coda");
+  assert.strictEqual(m.stato.fase, "RIVELAZIONE");
+  const r = m.stato.rivelazione;
+  assert.strictEqual(r.motivoNonVenduto, "reparto chiuso dal banditore");
+  assert.strictEqual(r.offerteInOrdine.length, 0, "le buste cestinate NON vengono aperte");
+  assert.ok(r.annuncio.includes("Reparto chiuso"), "la voce annuncia la chiusura: " + r.annuncio);
+  assert.ok(m.stato.nonVenduti.includes(0) && m.stato.nonVenduti.includes(1), "svincolati definitivi");
+  assert.strictEqual(m.stato.squadre[2].budgetResiduo, 500, "nessuno ha pagato: buste volate via");
+  m.prossimo();
+  assert.strictEqual(m.corrente.nome, "C1", "si salta direttamente al reparto successivo");
+  assert.ok(m.stato.eventi.some((e) => e.tipo === "RepartoChiuso" && e.ruolo === "A"));
+  // ogni giocatore chiuso ha un roundId SUO (l'export non deve mescolare offerte)
+  const roundChiusi = m.stato.eventi.filter((e) => e.tipo === "NonVenduto" && e.motivo === "reparto chiuso dal banditore").map((e) => e.roundId);
+  assert.strictEqual(new Set(roundChiusi).size, roundChiusi.length, "roundId unici per i chiusi");
+});
+
+test("chiudiReparto dalla RIVELAZIONE: chiude solo la coda, il round appena concluso resta com'è", () => {
+  const m = new MotoreAsta();
+  m.avvia(cfgStd({ quote: { P: 1, D: 1, C: 1, A: 2 } }), parts8(), [
+    { id: 0, nome: "A1", ruolo: "A", quotazioneBase: 20 },
+    { id: 1, nome: "A2", ruolo: "A", quotazioneBase: 20 },
+    { id: 2, nome: "C1", ruolo: "C", quotazioneBase: 20 },
+  ]);
+  m.offri(3, 12);
+  for (const i of [1, 2, 4, 5, 6, 7, 8]) m.offri(i, 0);
+  assert.strictEqual(m.stato.rivelazione.vincitore, "P3", "A1 aggiudicato");
+  const esito = m.chiudiReparto();
+  assert.strictEqual(esito.ok, true);
+  assert.strictEqual(esito.giocatori, 1, "solo A2 (in coda): il round di A1 è già chiuso");
+  assert.strictEqual(m.stato.squadre[3].budgetResiduo, 488, "l'aggiudicazione resta");
+  assert.strictEqual(m.stato.rivelazione.vincitore, "P3", "la rivelazione resta sullo schermo");
+  m.prossimo();
+  assert.strictEqual(m.corrente.nome, "C1");
+});
+
+test("prossimo scarta in silenzio i non idonei: niente rivelazioni inutili a fine reparto", () => {
+  const m = new MotoreAsta();
+  // A2 costa 100 con quotazione-obbligatoria: coi budget a 25 nessuno può puntarlo
+  m.avvia(cfgStd({ quote: { P: 1, D: 1, C: 1, A: 2 }, budgetIniziale: 25, baseComeMinimo: true }), parts8(), [
+    { id: 0, nome: "A1", ruolo: "A", quotazioneBase: 20 },
+    { id: 1, nome: "A2", ruolo: "A", quotazioneBase: 100 },
+    { id: 2, nome: "C1", ruolo: "C", quotazioneBase: 20 },
+  ]);
+  m.offri(5, 20);
+  for (const i of [1, 2, 3, 4, 6, 7, 8]) m.offri(i, 0);
+  assert.strictEqual(m.stato.rivelazione.vincitore, "P5");
+  m.prossimo();
+  // A2 non ha NESSUN idoneo (min 100 > budget di tutti): svincolato senza schermo
+  assert.strictEqual(m.corrente.nome, "C1", "si arriva diretti al centrocampista");
+  assert.ok(m.stato.nonVenduti.includes(1), "svincolato con evento");
+  assert.ok(m.stato.eventi.some((e) => e.tipo === "NonVenduto" && e.motivo === "nessuno idoneo (reparto pieno)" && e.idGiocatore === 1));
+  // roundId distinti: l'export «Offerte» non deve mischiare i round
+  const ids = m.stato.eventi.filter((e) => e.tipo === "NonVenduto" && e.motivo === "nessuno idoneo (reparto pieno)").map((e) => e.roundId);
+  assert.strictEqual(new Set(ids).size, ids.length);
+});
+
+test("vista SOSPESA in rivelazione: crediti e rose si aggiornano solo DOPO la proclamazione", async () => {
+  const dirTmp = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "astaweb-"));
+  const server = creaServer({ dirDati: dirTmp });
+  const porta = await ascolta(server);
+  const pin = server.sessione.pin;
+  try {
+    const tA = (await chiama(porta, "/api/entra", "POST", JSON.stringify({ nome: "Alfa" }))).json.token;
+    await chiama(porta, "/api/entra", "POST", JSON.stringify({ nome: "Beta" }));
+    await chiama(porta, "/api/lista", "POST", Buffer.from(csvDemo), { "x-pin": pin });
+    await chiama(porta, "/api/config", "POST", JSON.stringify({ pin, config: { budgetIniziale: 500 } }));
+    await chiama(porta, "/api/avvia", "POST", JSON.stringify({ pin }));
+    await chiama(porta, "/api/offerta", "POST", JSON.stringify({ pid: 1, token: tA, importo: 40 }));
+    await chiama(porta, "/api/azione", "POST", JSON.stringify({ pin, azione: "forza" }));
+    // RIVELAZIONE: la vista NON contiene il budget aggiornato (il vincitore è Alfa)
+    let v = await primaVistaSse(porta, "pid=1");
+    assert.strictEqual(v.fase, "RIVELAZIONE");
+    assert.strictEqual(v.budgetResiduo, 500, "budget SOSPESO durante la proclamazione");
+    assert.strictEqual(v.rosaCount, 0, "rosa SOSPESA durante la proclamazione");
+    assert.strictEqual(v.squadre.find((s) => s.id === 1).rosa.length, 0);
+    assert.strictEqual(v.statistiche.A.venduti, 0, "le statistiche non anticipano il vincitore");
+    const vb = await primaVistaSse(porta, "pin=" + pin);
+    assert.strictEqual(vb.partecipanti.find((p) => p.id === 1).budgetResiduo, 500, "sospesa anche per il banditore");
+    // dopo la proclamazione (passaggio al round dopo) tutto si aggiorna
+    await chiama(porta, "/api/azione", "POST", JSON.stringify({ pin, azione: "prossimo" }));
+    v = await primaVistaSse(porta, "pid=1");
+    assert.notStrictEqual(v.fase, "RIVELAZIONE");
+    assert.strictEqual(v.budgetResiduo, 460, "budget reale dopo la proclamazione");
+    assert.strictEqual(v.rosaCount, 1);
+  } finally {
+    if (server.closeAllConnections) server.closeAllConnections();
+    await new Promise((ok) => server.close(ok));
+    fs.rmSync(dirTmp, { recursive: true, force: true });
+  }
+});
+
+test("battute: interruttore del banditore in qualunque momento, sentito dall'annuncio successivo", async () => {
+  const dirTmp = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "astaweb-"));
+  const server = creaServer({ dirDati: dirTmp });
+  const porta = await ascolta(server);
+  const pin = server.sessione.pin;
+  try {
+    const tA = (await chiama(porta, "/api/entra", "POST", JSON.stringify({ nome: "Alfa" }))).json.token;
+    await chiama(porta, "/api/entra", "POST", JSON.stringify({ nome: "Beta" }));
+    await chiama(porta, "/api/lista", "POST", Buffer.from(csvDemo), { "x-pin": pin });
+    await chiama(porta, "/api/avvia", "POST", JSON.stringify({ pin }));
+    // spente DOPO l'avvio (si può fare in qualunque momento della serata)
+    let r = await chiama(porta, "/api/azione", "POST", JSON.stringify({ pin, azione: "battute", valore: false }));
+    assert.strictEqual(r.stato, 200, "toggle battute ok");
+    await chiama(porta, "/api/offerta", "POST", JSON.stringify({ pid: 1, token: tA, importo: 30 }));
+    await chiama(porta, "/api/azione", "POST", JSON.stringify({ pin, azione: "forza" }));
+    let v = await primaVistaSse(porta, "pin=" + pin);
+    assert.strictEqual(v.config.battute, false, "la vista espone il flag");
+    const { POOL } = require("./voce-banditore.js");
+    const tutte = [...POOL.COMMENTI_ALTI, ...POOL.COMMENTI_ECONOMICI, ...POOL.COMMENTI_RISICATI, ...POOL.COMMENTI_GENERALI]
+      .map((f) => f.replace(/\{g\}/g, v.rivelazione.giocatore.nome).replace(/\{n\}/g, "Alfa").replace(/\{p\}/g, "30"));
+    assert.ok(!tutte.some((f) => v.rivelazione.annuncio.includes(f)), "annuncio senza battute: " + v.rivelazione.annuncio);
+    assert.ok(v.rivelazione.annuncio.includes("Alfa") && v.rivelazione.annuncio.includes("30"), "risultato completo");
+    // riaccese: il flag torna visibile a tutte le pagine del banditore
+    r = await chiama(porta, "/api/azione", "POST", JSON.stringify({ pin, azione: "battute", valore: true }));
+    v = await primaVistaSse(porta, "pin=" + pin);
+    assert.strictEqual(v.config.battute, true);
+  } finally {
+    if (server.closeAllConnections) server.closeAllConnections();
+    await new Promise((ok) => server.close(ok));
+    fs.rmSync(dirTmp, { recursive: true, force: true });
+  }
+});
+
+test("persistenza anti-blackout: stato.json corrotto → si riprende dal backup .bak", async () => {
+  const dirTmp = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "astaweb-"));
+  const server = creaServer({ dirDati: dirTmp });
+  const porta = await ascolta(server);
+  const pin = server.sessione.pin;
+  try {
+    await chiama(porta, "/api/entra", "POST", JSON.stringify({ nome: "Alfa" }));
+    await chiama(porta, "/api/entra", "POST", JSON.stringify({ nome: "Beta" }));
+    await chiama(porta, "/api/lista", "POST", Buffer.from(csvDemo), { "x-pin": pin });
+    await chiama(porta, "/api/avvia", "POST", JSON.stringify({ pin }));
+    await chiama(porta, "/api/azione", "POST", JSON.stringify({ pin, azione: "salta" }));
+    await new Promise((ok) => server.close(ok));
+    // blackout brutale: stato.json tranciato a metà, il .bak è il penultimo buono
+    const fileStato = path.join(dirTmp, "stato.json");
+    const buono = fs.readFileSync(path.join(dirTmp, "stato.json.bak"), "utf8");
+    fs.writeFileSync(fileStato, buono.slice(0, Math.floor(buono.length / 2)), "utf8");
+    assert.strictEqual(fs.existsSync(fileStato + ".tmp"), false, "nessun .tmp residuo in giro");
+    const server2 = creaServer({ dirDati: dirTmp });
+    const porta2 = await ascolta(server2);
+    try {
+      const v = await primaVistaSse(porta2, "pin=" + server2.sessione.pin);
+      assert.strictEqual(v.avviata, true, "sessione ripresa dal backup dopo la corruzione");
+      assert.ok(v.roundId >= 1);
+    } finally {
+      if (server2.closeAllConnections) server2.closeAllConnections();
+      await new Promise((ok) => server2.close(ok));
+    }
+  } finally {
+    fs.rmSync(dirTmp, { recursive: true, force: true });
+  }
+});
+
+test("export OFFERTE: un foglio ordinato con ogni busta, fase ed esito (via API)", async () => {
+  const dirTmp = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "astaweb-"));
+  const server = creaServer({ dirDati: dirTmp });
+  const porta = await ascolta(server);
+  const pin = server.sessione.pin;
+  try {
+    const tA = (await chiama(porta, "/api/entra", "POST", JSON.stringify({ nome: "Alfa" }))).json.token;
+    const tB = (await chiama(porta, "/api/entra", "POST", JSON.stringify({ nome: "Beta" }))).json.token;
+    await chiama(porta, "/api/lista", "POST", Buffer.from(csvDemo), { "x-pin": pin });
+    await chiama(porta, "/api/avvia", "POST", JSON.stringify({ pin }));
+    // round 1 (G3): Alfa 10, Beta 22 → aggiudicato a Beta
+    await chiama(porta, "/api/offerta", "POST", JSON.stringify({ pid: 1, token: tA, importo: 10 }));
+    await chiama(porta, "/api/offerta", "POST", JSON.stringify({ pid: 2, token: tB, importo: 22 }));
+    await chiama(porta, "/api/azione", "POST", JSON.stringify({ pin, azione: "prossimo" }));
+    // round 2: Alfa passa, Beta punta 5
+    await chiama(porta, "/api/offerta", "POST", JSON.stringify({ pid: 1, token: tA, importo: 0 }));
+    await chiama(porta, "/api/offerta", "POST", JSON.stringify({ pid: 2, token: tB, importo: 5 }));
+    await chiama(porta, "/api/azione", "POST", JSON.stringify({ pin, azione: "termina" }));
+
+    const r = await scaricaBinario(porta, "/api/esporta.offerte.xlsx?pin=" + pin);
+    assert.strictEqual(r.stato, 200, "download offerte");
+    assert.strictEqual(r.buf.readUInt16LE(0), 0x4b50, "zip valido");
+    const voci = unzip(r.buf);
+    assert.ok(voci["xl/workbook.xml"].toString("utf8").includes("Offerte"), "foglio Offerte presente");
+    const xml = voci["xl/worksheets/sheet1.xml"].toString("utf8");
+    assert.ok(xml.includes("G3"), "giocatore nel foglio offerte");
+    assert.ok(xml.includes("AGGIUDICATA") && xml.includes("persa") && xml.includes("passo"), "esiti presenti");
+    // protezione PIN
+    assert.strictEqual((await chiama(porta, "/api/esporta.offerte.xlsx?pin=0000")).stato, 403);
+  } finally {
+    if (server.closeAllConnections) server.closeAllConnections();
+    await new Promise((ok) => server.close(ok));
+    fs.rmSync(dirTmp, { recursive: true, force: true });
+  }
+});
+
+test("generaXlsxOfferte: ordine per round, decrescente dentro il round, spareggi marcati", () => {
+  const m = new MotoreAsta();
+  m.avvia(cfgStd(), parts8(), listaStd());
+  // round 1: due pari 20-20 → spareggio 21-25 → vince P5
+  m.offri(2, 20); m.offri(5, 20);
+  for (let i = 1; i <= 8; i++) if (i !== 2 && i !== 5) m.offri(i, 0);
+  m.offri(2, 21); m.offri(5, 25);
+  const { generaXlsxOfferte } = require("./esporta-xlsx.js");
+  const xml = unzip(generaXlsxOfferte(m.stato))["xl/worksheets/sheet1.xml"].toString("utf8");
+  assert.ok(xml.includes("Asta"), "fase asta");
+  assert.ok(xml.includes("Spareggio 1"), "il giro di spareggio marcato col suo numero");
+  assert.ok(xml.includes("AGGIUDICATA"), "esito della busta vincente");
+});
+
+test("/api/liberi: giocatori non assegnati per reparto, senza il corrente e senza gli assegnati", async () => {
+  const dirTmp = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "astaweb-"));
+  const server = creaServer({ dirDati: dirTmp });
+  const porta = await ascolta(server);
+  const pin = server.sessione.pin;
+  try {
+    await chiama(porta, "/api/entra", "POST", JSON.stringify({ nome: "Alfa" }));
+    await chiama(porta, "/api/entra", "POST", JSON.stringify({ nome: "Beta" }));
+    await chiama(porta, "/api/lista", "POST", Buffer.from(csvDemo), { "x-pin": pin });
+    await chiama(porta, "/api/avvia", "POST", JSON.stringify({ pin }));
+    const r = await chiama(porta, "/api/liberi");
+    const j = r.json;
+    assert.strictEqual(j.perRuolo.A.inCoda.length, 11, "12 A in lista, 1 corrente escluso");
+    assert.ok(j.perRuolo.A.inCoda.every((g) => g.nome.startsWith("G")), "nomi in coda");
+    assert.strictEqual(j.perRuolo.P.inCoda.length, 13, "13 portieri nel csvDemo, tutti in coda");
+    // pre-avvio: perRuolo null
+    const rNuova = await chiama(porta, "/api/nuova", "POST", JSON.stringify({ pin }));
+    assert.strictEqual(rNuova.stato, 200);
+    const r2 = await chiama(porta, "/api/liberi");
+    assert.strictEqual(r2.json.perRuolo, null, "senza asta avviata niente elenco");
   } finally {
     if (server.closeAllConnections) server.closeAllConnections();
     await new Promise((ok) => server.close(ok));

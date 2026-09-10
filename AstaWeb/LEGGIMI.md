@@ -1,4 +1,4 @@
-# ASTA BUSTA CHIUSA — edizione multi-dispositivo (ognuno col suo telefono)
+# FANTASTA · ASTA REALTIME (busta chiusa) — edizione multi-dispositivo (ognuno col suo telefono)
 
 La stessa asta a buste chiuse dell'app Android (stesse regole, stesso motore collaudato),
 ma stavolta **ogni partecipante punta dal proprio telefonino**, senza installare nulla:
@@ -17,13 +17,17 @@ si collega col browser alla Wi-Fi della serata.
 4. A ogni giocatore: sul telefono di tutti appare **solo il nome** (mai la quotazione base,
    mai le offerte altrui); ognuno digita la propria offerta segreta o passa.
 5. Quando tutti hanno consegnato — o il banditore preme **Chiudi ora** — la rivelazione
-   appare **sul telefono di ciascuno** e **la voce del banditore annuncia** (TTS italiano,
-   italiano e barese): le 3-4 offerte più alte in ordine crescente (tutte se sono meno),
-   l'eventuale spareggio raccontato, e la chiusura sul vincitore. La voce esce dal
-   **dispositivo del banditore che ha la spunta «Questo dispositivo parla»**: il telefono
-   (consigliato, eventuale cassa Bluetooth) o il computer.
-6. Squadre e budget sempre aggiornati nella pagina; a fine asta **esportazione Excel
-   multi-foglio** (squadre, riepilogo, asta completa, analisi, svincolati) o CSV delle rose.
+   appare **sul telefono di ciascuno** e **la voce del banditore annuncia** (TTS italiano):
+   le 3-4 offerte più alte in ordine crescente (tutte se sono meno),
+   l'eventuale spareggio raccontato, e la chiusura sul vincitore. **Le ultime due buste si
+   aprono più lentamente, insieme** (la suspance vera), e crediti/rose restano «sospesi»
+   finché la proclamazione non è passata: nessuno scopre il vincitore guardando i crediti.
+   La voce esce dal **dispositivo del banditore che ha la spunta «Questo dispositivo parla»**
+   e le **battute (una su cinque, di più sui costosi) si spengono col toggle «Battute 🎭»**.
+6. Squadre e budget sempre aggiornati nella pagina (con **spesi per reparto** nelle rose e
+   pannello **«Ancora liberi»** reparto per reparto); il banditore può **chiudere un reparto**
+   con un tasto. A fine asta **esportazione Excel multi-foglio** (squadre, riepilogo, asta
+   completa, analisi, svincolati), **file offerte ordinato** o CSV delle rose.
 
 ## Requisiti (solo per il pc del banditore)
 
@@ -33,8 +37,9 @@ si collega col browser alla Wi-Fi della serata.
 ## Robustezza
 
 - **Autosalvataggio dopo ogni mossa** in `data/` (snapshot + log eventi append-only):
-  se il pc si spegne o il server si riavvia, l'asta riprende da dove era; i partecipanti
-  rientrano col proprio nome.
+  se il pc si spegne — anche staccando la corrente — l'asta riprende da dove era; lo
+  snapshot è scritto in modo atomico e col paracadute del penultimo backup; i
+  partecipanti rientrano col proprio nome.
 - Le offerte non lasciano MAI il server prima della chiusura: la vista del banditore stesso
   non contiene gli importi del round in corso (verificato da test dedicato).
 - Nomi duplicati rifiutati; rientro col proprio nome consentito anche a asta iniziata;
@@ -42,8 +47,8 @@ si collega col browser alla Wi-Fi della serata.
 
 ## Collaudo effettuato (massimo rigore)
 
-- **59 test automatici Node** in 4 suite (tutte in `prova-tutto.bat` e in CI):
-  - `asta-server.test.js` (38): motore di regole portato dal Kotlin, parser CSV/XLSX con
+- **87 test automatici Node** in 4 suite (tutte in `prova-tutto.bat` e in CI):
+  - `asta-server.test.js` (60): motore di regole portato dal Kotlin, parser CSV/XLSX con
     fixture reali e file corrotti, **fuzz di 300 aste complete con invarianti a ogni passo**,
     server HTTP con **verifica di segretezza delle offerte**, spareggio via API, **riavvio
     del server con ripresa dello stato**, annuncio cachato (Ripeti voce identico),
@@ -57,7 +62,8 @@ si collega col browser alla Wi-Fi della serata.
     compilare (antigressione della pagina morta del 30/08).
   - `collaudo-liste.test.js` (1): listone ufficiale 228 giocatori + integrazione server.
 - **Collaudo E2E nel browser reale** (`e2e.js`, due Chrome isolati a viewport telefono 420×900,
-  23 checkpoint): registrazione, **ingresso del banditore dalla pagina partecipante**, setup,
+  31 checkpoint): regie con checkpoint **chiudi reparto**, **crediti sospesi durante la
+  rivelazione**, **tendine che restano aperte**, **toggle battute** e **file offerte** (10/09): registrazione, **ingresso del banditore dalla pagina partecipante**, setup,
   avvio con conferma nativa, **modalità telefonino (toggle voce, bottoni touch ≥48px)**, nome
   senza quotazione sul telefono, busta segreta dalla UI, chiusura automatica, rivelazione
   crescente con annuncio v3 (offerte basse mai lette), **forza chiusura con motivo coerente,

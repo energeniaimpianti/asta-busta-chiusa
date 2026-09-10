@@ -1,5 +1,5 @@
 /**
- * ASTA BUSTA CHIUSA — server locale per l'asta multi-dispositivo (ognuno col suo telefono).
+ * FANTASTA — ASTA REALTIME · server locale per l'asta multi-dispositivo (ognuno col suo telefono).
  *
  * Zero dipendenze npm: solo Node.js standard (http, fs, zlib, crypto).
  * Architettura: motore di regole puro (porting fedele del motore Kotlin già collaudato
@@ -21,7 +21,7 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const zlib = require("zlib");
-const { generaXlsx } = require("./esporta-xlsx.js");
+const { generaXlsx, generaXlsxOfferte } = require("./esporta-xlsx.js");
 const { generaAnnuncio } = require("./voce-banditore.js");
 const crypto = require("crypto");
 
@@ -39,6 +39,7 @@ const CONFIG_DEFAULT = {
   baseComeMinimo: false,
   ordineCasuale: false,
   seed: 2026,
+  battute: true, // le battute del banditore: una su cinque, di più sui costosi (10/09)
 };
 
 function normalizzaRuolo(testo) {
@@ -166,18 +167,23 @@ class MotoreAsta {
 
   get corrente() { return this.stato && this.stato.correnteId != null ? this.stato.listaById[this.stato.correnteId] : null; }
 
-  _quota(r) { return this.stato.config.quote[r] || 0; }
-  _countRuolo(pid, r) { return (this.stato.squadre[pid].rosa || []).filter((a) => this.stato.listaById[a.idGiocatore].ruolo === r).length; }
-  _slotVuoti(pid) {
-    const tot = Object.values(this.stato.config.quote).reduce((a, b) => a + b, 0);
-    return tot - this.stato.squadre[pid].rosa.length;
+  /** Annuncio cachato nella rivelazione: rispetta il flag «battute» del banditore. */
+  _annuncio(r) {
+    r.annuncio = generaAnnuncio(r, undefined, { battute: this.stato.config.battute !== false });
   }
 
-  maxOfferta(pid) {
+  _quota(r) { return this.stato.config.quote[r] || 0; }
+  _countRuolo(pid, r) { return (this.stato.squadre[pid].rosa || []).filter((a) => this.stato.listaById[a.idGiocatore].ruolo === r).length; }
+  _slotVuoti(pid, squadre) {
+    const tot = Object.values(this.stato.config.quote).reduce((a, b) => a + b, 0);
+    return tot - (squadre || this.stato.squadre)[pid].rosa.length;
+  }
+
+  maxOfferta(pid, squadre) {
     const s = this.stato;
-    const b = s.squadre[pid].budgetResiduo;
+    const b = (squadre || s.squadre)[pid].budgetResiduo;
     if (!s.config.regolaResto) return b;
-    return Math.max(0, b - (this._slotVuoti(pid) - 1));
+    return Math.max(0, b - (this._slotVuoti(pid, squadre) - 1));
   }
 
   minOffertaCorrente() {
@@ -254,7 +260,7 @@ class MotoreAsta {
       if (n > max) return { ok: false, errore: `Offerta massima: ${max}` };
     }
     s.offerte[pid] = n;
-    this._evento("OffertaRegistrata", { roundId: s.roundId, idPartecipante: pid, importo: n, spareggio: inSpareggio });
+    this._evento("OffertaRegistrata", { roundId: s.roundId, idPartecipante: pid, importo: n, spareggio: inSpareggio, giro: inSpareggio ? s.spareggi : 0 });
     if (this.interrogabili().length === 0) this._risolvi();
     return { ok: true };
   }
@@ -286,10 +292,48 @@ class MotoreAsta {
     const base = s.spareggi > 0 ? s.offerteRoundPrincipale : s.offerte;
     s.nonVenduti.push(g.id);
     s.rivelazione = this._rivelazione(g, base, null, 0, s.spareggi, s.ultimoSpareggio, true, "saltato dal banditore");
-    s.rivelazione.annuncio = generaAnnuncio(s.rivelazione);
+    this._annuncio(s.rivelazione);
     s.fase = FASI.RIVELAZIONE;
+    // anche l'evento NonVenduto col roundId: l'export «Offerte» collega così le
+    // buste già consegnate al giocatore saltato (prima si perdevano)
     this._evento("SaltaGiocatore", { idGiocatore: g.id });
+    this._evento("NonVenduto", { roundId: s.roundId, idGiocatore: g.id, motivo: "saltato dal banditore" });
     return { ok: true };
+  }
+
+  /** CHIUSURA DEL REPARTO (richiesta 10/09): il banditore chiude le aste del
+   *  reparto in corso — i giocatori rimasti (corrente compreso, se il round è
+   *  ancora aperto) restano svincolati definitivi e l'asta salta al reparto
+   *  successivo. Le buste già consegnate del round aperto non vengono aperte. */
+  chiudiReparto() {
+    const s = this.stato;
+    const g = this.corrente;
+    if (!g) return { ok: false, errore: "Nessun reparto in corso" };
+    if (s.fase === FASI.FINE) return { ok: false, errore: "Asta già conclusa" };
+    const ruolo = g.ruolo;
+    const chiusi = [];
+    if (s.fase === FASI.ATTESA || s.fase === FASI.SPAREGGIO) {
+      // round APERTO: le buste volano via sigillate, il giocatore è svincolato
+      s.nonVenduti.push(g.id);
+      s.rivelazione = this._rivelazione(g, {}, null, 0, s.spareggi, s.ultimoSpareggio, true, "reparto chiuso dal banditore");
+      s.rivelazione.provvisorio = false;
+      this._annuncio(s.rivelazione);
+      s.fase = FASI.RIVELAZIONE;
+      chiusi.push(g.id);
+      this._evento("NonVenduto", { roundId: s.roundId, idGiocatore: g.id, motivo: "reparto chiuso dal banditore" });
+    }
+    // tutta la coda del reparto (è un blocco contiguo in testa): roundId fresco
+    // per ognuno, così l'export non attribuisce loro offerte altrui
+    while (s.coda.length > 0 && s.listaById[s.coda[0]].ruolo === ruolo) {
+      const id = s.coda[0];
+      s.coda = s.coda.slice(1);
+      s.roundId += 1;
+      s.nonVenduti.push(id);
+      chiusi.push(id);
+      this._evento("NonVenduto", { roundId: s.roundId, idGiocatore: id, motivo: "reparto chiuso dal banditore" });
+    }
+    this._evento("RepartoChiuso", { roundId: s.roundId, ruolo, giocatori: chiusi.length });
+    return { ok: true, ruolo, giocatori: chiusi.length };
   }
 
   _risolvi() {
@@ -353,7 +397,7 @@ class MotoreAsta {
     s.fase = FASI.RIVELAZIONE;
     s.rivelazione = this._rivelazione(g, s.offerteRoundPrincipale, vincitore, importo, s.spareggi, { ...s.offerte }, false, "");
     s.rivelazione.sorteggiato = true;
-    s.rivelazione.annuncio = generaAnnuncio(s.rivelazione);
+    this._annuncio(s.rivelazione);
     s.ultimaAggiudicazione = evento;
     this._evento("Sorteggio", evento);
   }
@@ -366,7 +410,7 @@ class MotoreAsta {
     const evento = { roundId: s.roundId, idGiocatore: g.id, idPartecipante: idVincitore, importo, spareggi: s.spareggi };
     s.fase = FASI.RIVELAZIONE;
     s.rivelazione = this._rivelazione(g, offertePrincipali, idVincitore, importo, s.spareggi, spareggio, false, "");
-    s.rivelazione.annuncio = generaAnnuncio(s.rivelazione);
+    this._annuncio(s.rivelazione);
     s.ultimaAggiudicazione = evento;
     this._evento("Aggiudicazione", evento);
   }
@@ -397,7 +441,7 @@ class MotoreAsta {
     // provvisorio = il giocatore NON è svincolato: torna in coda e verrà richiamato
     // (la voce lo annuncia diversamente — fix 08/09/2026)
     s.rivelazione.provvisorio = !definitivo;
-    s.rivelazione.annuncio = generaAnnuncio(s.rivelazione);
+    this._annuncio(s.rivelazione);
     this._evento("NonVenduto", { roundId: s.roundId, idGiocatore: g.id, motivo });
   }
 
@@ -458,20 +502,29 @@ class MotoreAsta {
       s.ultimaAggiudicazione = null;
       return s;
     }
-    const idProssimo = s.coda[0];
-    const g = s.listaById[idProssimo];
-    const min = s.config.baseComeMinimo ? Math.max(1, g.quotazioneBase) : 1;
-    const qualcunoIdoneo = s.partecipanti.some(
-      (p) => this._countRuolo(p.id, g.ruolo) < this._quota(g.ruolo) && this.maxOfferta(p.id) >= min
-    );
-    this._impostaCorrente(idProssimo);
-    if (!qualcunoIdoneo) {
-      s.nonVenduti.push(g.id);
-      s.fase = FASI.RIVELAZIONE;
-      s.rivelazione = this._rivelazione(g, {}, null, 0, 0, {}, true, "nessuno idoneo (reparto pieno)");
-      s.rivelazione.annuncio = generaAnnuncio(s.rivelazione);
-      this._evento("NonVenduto", { roundId: s.roundId, idGiocatore: g.id, motivo: "nessuno idoneo (reparto pieno)" });
+    // SCARTO SILENZIOSO (10/09): i giocatori con NESSUN idoneo (reparto pieno per
+    // tutti, o budget insufficiente) non vengono più mostrati uno a uno con la
+    // loro «rivelazione» inutile: si svincolano in un colpo e si passa al primo
+    // giocatore realmente puntabile — a fine reparto la coda scorre da sola
+    while (s.coda.length > 0) {
+      const idProssimo = s.coda[0];
+      const g = s.listaById[idProssimo];
+      const min = s.config.baseComeMinimo ? Math.max(1, g.quotazioneBase) : 1;
+      const qualcunoIdoneo = s.partecipanti.some(
+        (p) => this._countRuolo(p.id, g.ruolo) < this._quota(g.ruolo) && this.maxOfferta(p.id) >= min
+      );
+      this._impostaCorrente(idProssimo);
+      if (!qualcunoIdoneo) {
+        s.nonVenduti.push(g.id);
+        this._evento("NonVenduto", { roundId: s.roundId, idGiocatore: g.id, motivo: "nessuno idoneo (reparto pieno)" });
+        continue;
+      }
+      return s;
     }
+    // la coda si è svuotata con gli scarti silenziosi
+    s.fase = FASI.FINE;
+    s.correnteId = null;
+    s.ultimaAggiudicazione = null;
     return s;
   }
 
@@ -580,10 +633,12 @@ class MotoreAsta {
     return s;
   }
 
-  statistiche() {
+  /** Statistiche per reparto. Con `squadre` passato (la vista SOSPESA durante la
+   *  rivelazione) i «venduti» non contano l'aggiudicazione appena avvenuta. */
+  statistiche(squadre) {
     const s = this.stato;
     const venduti = new Set();
-    for (const sq of Object.values(s.squadre)) for (const a of sq.rosa) venduti.add(a.idGiocatore);
+    for (const sq of Object.values(squadre || s.squadre)) for (const a of sq.rosa) venduti.add(a.idGiocatore);
     const out = {};
     for (const r of Object.keys(RUOLI)) {
       const delRuolo = s.lista.filter((g) => g.ruolo === r).map((g) => g.id);
@@ -884,11 +939,33 @@ function leggiFoglio(xmlBuf, shared) {
 
 // ============================================================ PERSISTENZA
 
+/** Rinomina tmp -> dest reggendosi ai capricci di Windows: il rename su un
+ *  file esistente può fallire con EPERM per un istante (antivirus, indexer,
+ *  disco di rete). Cascata: rename, pausa e rename, copia, scrittura diretta. */
+function scriviConRinforzo(tmp, dest) {
+  for (let t = 0; t < 4; t++) {
+    try { fs.renameSync(tmp, dest); return; } catch (_) { /* riprova */ }
+    try { fs.unlinkSync(dest); } catch (_) { /* magari non esiste */ }
+    try { fs.renameSync(tmp, dest); return; } catch (_) { /* riprova dopo la pausa */ }
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25); // pausa sincrona di 25ms
+  }
+  try {
+    fs.copyFileSync(tmp, dest);
+    fs.unlinkSync(tmp);
+  } catch (_) {
+    // ultima spiaggia: scrittura diretta (non atomica, ma la mossa si salva)
+    const testo = fs.readFileSync(tmp, "utf8");
+    fs.writeFileSync(dest, testo, "utf8");
+    try { fs.unlinkSync(tmp); } catch (_) {}
+  }
+}
+
 class Persistenza {
   constructor(dir) {
     this.dir = dir;
     fs.mkdirSync(dir, { recursive: true });
     this.fileStato = path.join(dir, "stato.json");
+    this.fileBak = path.join(dir, "stato.json.bak");
     this.fileEventi = path.join(dir, "eventi.jsonl");
     this.eventiPersistiti = 0;
   }
@@ -899,7 +976,22 @@ class Persistenza {
       fs.appendFileSync(this.fileEventi, nuovi.map((e) => JSON.stringify(e)).join("\n") + "\n", "utf8");
       this.eventiPersistiti = eventi.length;
     }
-    fs.writeFileSync(this.fileStato, JSON.stringify(this.snapshot(statoSessione), null, 1), "utf8");
+    // SCRITTURA ATOMICA (nero del 10/09): un distacco di luce a metà scrittura
+    // non può lasciare stato.json monco — si scrive su .tmp con fsync, poi si
+    // rinomina; il penultimo snapshot resta come paracadute in .bak.
+    // Il rename su disco di rete / antivirus può dare EPERM transitorio: si
+    // riprova e in ultima istanza si copia (meglio non atomico che perdere la mossa)
+    const dati = JSON.stringify(this.snapshot(statoSessione), null, 1);
+    const tmp = this.fileStato + ".tmp";
+    const fd = fs.openSync(tmp, "w");
+    try {
+      fs.writeFileSync(fd, dati, "utf8");
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
+    try { if (fs.existsSync(this.fileStato)) fs.copyFileSync(this.fileStato, this.fileBak); } catch (_) { /* il paracadute è best-effort */ }
+    scriviConRinforzo(tmp, this.fileStato);
   }
   snapshot(ss) {
     return {
@@ -914,23 +1006,31 @@ class Persistenza {
       motoreStato: ss.motore.stato,
     };
   }
-  carica() {
-    try {
-      if (!fs.existsSync(this.fileStato)) return null;
-      const o = JSON.parse(fs.readFileSync(this.fileStato, "utf8"));
-      if (o.motoreStato) {
-        const m = new MotoreAsta();
-        m.ripristina(o.motoreStato);
-        o.motore = m;
-      }
-      this.eventiPersistiti = 0; // gli eventi restano solo nel log su disco
-      return o;
-    } catch (e) {
-      return null;
+  _leggiStato(file) {
+    const o = JSON.parse(fs.readFileSync(file, "utf8"));
+    if (o && o.motoreStato) {
+      const m = new MotoreAsta();
+      m.ripristina(o.motoreStato);
+      o.motore = m;
     }
+    return o;
+  }
+  carica() {
+    // prima lo snapshot corrente; se è corrotto (mezza scrittura sopravvissuta
+    // comunque al rename), si riprova col penultimo (.bak)
+    for (const f of [this.fileStato, this.fileBak]) {
+      try {
+        if (!fs.existsSync(f)) continue;
+        const o = this._leggiStato(f);
+        this.eventiPersistiti = 0; // gli eventi restano solo nel log su disco
+        return o;
+      } catch (e) { /* prova il prossimo file */ }
+    }
+    this.eventiPersistiti = 0;
+    return null;
   }
   azzera() {
-    for (const f of [this.fileStato, this.fileEventi]) { try { fs.unlinkSync(f); } catch (_) {} }
+    for (const f of [this.fileStato, this.fileBak, this.fileStato + ".tmp", this.fileEventi]) { try { fs.unlinkSync(f); } catch (_) {} }
     this.eventiPersistiti = 0;
   }
 }
@@ -1029,10 +1129,31 @@ function creaServer(opzioni = {}) {
           .filter(([, ts]) => Date.now() - ts < 7000)
           .map(([k]) => (k === "banditore" ? "banditore" : "partecipante"))
       ),  // 'banditore' | 'partecipante'
-      statistiche: sessione.avviata && s ? sessione.motore.statistiche() : null,
+      statistiche: sessione.avviata && s ? sessione.motore.statistiche(squadreSospese()) : null,
       codaRimanente: s ? s.coda.length : 0,
       roundId: s ? s.roundId : 0,
     };
+  }
+
+  /** Squadre come devono essere VISTE adesso: durante la RIVELAZIONE con
+   *  vincitore, crediti e rose NON contano l'aggiudicazione appena avvenuta —
+   *  si aggiornano solo al passaggio al round successivo, dopo la proclamazione
+   *  visiva (richiesta del 10/09: chi guardava i crediti scopriva il vincitore
+   *  in anticipo). Vale per banditore e partecipanti, su ogni dispositivo. */
+  function squadreSospese() {
+    const s = sessione.motore.stato;
+    const r = s && s.rivelazione;
+    if (!r || s.fase !== FASI.RIVELAZIONE || r.idVincitore == null) return s ? s.squadre : null;
+    const sos = {};
+    for (const [pid, sq] of Object.entries(s.squadre)) {
+      sos[pid] = Number(pid) === Number(r.idVincitore)
+        ? {
+          budgetResiduo: sq.budgetResiduo + r.importoFinale,
+          rosa: sq.rosa.filter((a) => a.idGiocatore !== r.idGiocatore),
+        }
+        : sq;
+    }
+    return sos;
   }
 
   /** Vista del BANDITORE: tutto TRANNE gli importi del round in corso (nemmeno lui li vede prima della chiusura). */
@@ -1047,6 +1168,7 @@ function creaServer(opzioni = {}) {
     }
     const s = sessione.motore.stato;
     const g = sessione.motore.corrente;
+    const sos = squadreSospese();
     return {
       ...base,
       preAvvio: false,
@@ -1055,16 +1177,14 @@ function creaServer(opzioni = {}) {
       partecipanti: s.partecipanti.map((p) => ({
         id: p.id, nome: p.nome,
         stato: sessione.motore.statoBid(p.id),
-        budgetResiduo: s.squadre[p.id].budgetResiduo,
-        rosa: s.squadre[p.id].rosa.length,
+        budgetResiduo: sos[p.id].budgetResiduo,
+        rosa: sos[p.id].rosa.length,
       })),
       spareggio: s.fase === "SPAREGGIO" ? { pari: sessione.motore._pariCorrente(), giri: s.spareggi } : null,
       rivelazione: s.rivelazione,
       squadre: vistaSquadre(),
       tuttiCompleti: sessione.motore.tuttiCompleti,
-      giocatoriLiberi: s.fase === "FINE" || s.fase === "RIVELAZIONE"
-        ? _giocatoriLiberi(s)
-        : _giocatoriLiberi(s),
+      giocatoriLiberi: _giocatoriLiberi(s),
       // annuncio CACHATO alla nascita della rivelazione: "Ripeti voce" e il testo
       // mostrato coincidono con quanto pronunciato (non rigenerato a ogni broadcast)
       ultimoAnnuncio: s.rivelazione ? (s.rivelazione.annuncio || generaAnnuncio(s.rivelazione)) : null,
@@ -1081,6 +1201,7 @@ function creaServer(opzioni = {}) {
     }
     const s = sessione.motore.stato;
     const g = sessione.motore.corrente;
+    const sos = squadreSospese();
     const mio = io && s.partecipanti.some((p) => p.id === pid) ? s.partecipanti.find((p) => p.id === pid) : null;
     if (!mio) return { ...baseP, preAvvio: sessione.avviata ? false : true, escluso: sessione.avviata };
     const out = {
@@ -1089,7 +1210,7 @@ function creaServer(opzioni = {}) {
       giocatore: g ? { nome: g.nome, ruolo: g.ruolo, quotazioneBase: g.quotazioneBase, squadra: g.squadra || "", bloccoPorta: g.ruolo === "P" ? (s.blocchiPorta && s.blocchiPorta[g.id]) || null : null } : null,
       mioStato: sessione.motore.statoBid(pid),
       minOfferta: sessione.motore.minOffertaCorrente(),
-      maxOfferta: sessione.motore.maxOfferta(pid),
+      maxOfferta: sessione.motore.maxOfferta(pid, sos),
       hannoConsegnato: s.fase === "ATTESA_OFFERTE"
         ? sessione.motore.idonei().filter((p) => p.id in s.offerte).map((p) => p.nome)
         : s.fase === "SPAREGGIO"
@@ -1099,8 +1220,8 @@ function creaServer(opzioni = {}) {
       spareggio: s.fase === "SPAREGGIO"
         ? { pari: sessione.motore._pariCorrente(), min: (s.spareggi >= 2 ? s.ultimoSpareggio[pid] : s.offerteRoundPrincipale[pid]) || 1, candidato: s.candidatiSpareggio.includes(pid), giri: s.spareggi }
         : null,
-      budgetResiduo: s.squadre[pid].budgetResiduo,
-      rosaCount: s.squadre[pid].rosa.length,
+      budgetResiduo: sos[pid].budgetResiduo,
+      rosaCount: sos[pid].rosa.length,
       rivelazione: s.rivelazione, // dopo la chiusura si vede da tutti, telefoni compresi
       squadre: vistaSquadre(),
       annullati: annullatiCorrenti(),
@@ -1111,11 +1232,12 @@ function creaServer(opzioni = {}) {
   function vistaSquadre() {
     if (!sessione.avviata || !sessione.motore.stato) return null;
     const s = sessione.motore.stato;
+    const sos = squadreSospese(); // durante la rivelazione: rose e crediti PRIMA dell'aggiudicazione
     return s.partecipanti.map((p) => ({
       id: p.id,
       nome: p.nome,
-      budgetResiduo: s.squadre[p.id].budgetResiduo,
-      rosa: s.squadre[p.id].rosa.map((a) => ({
+      budgetResiduo: sos[p.id].budgetResiduo,
+      rosa: sos[p.id].rosa.map((a) => ({
         idGiocatore: a.idGiocatore,
         nome: s.listaById[a.idGiocatore].nome,
         ruolo: s.listaById[a.idGiocatore].ruolo,
@@ -1123,6 +1245,26 @@ function creaServer(opzioni = {}) {
         importo: a.importo,
       })),
     }));
+  }
+
+  /** Giocatori LIBERI (non assegnati, non all'asta adesso), raggrupati per
+   *  reparto, per il pannello «ancora liberi» dei partecipanti (10/09): chi è
+   *  in coda arriverà all'asta, chi è svincolato è passato definitivamente. */
+  function liberiPerRuolo() {
+    const s = sessione.motore.stato;
+    if (!s) return null;
+    const assegnati = new Set();
+    for (const sq of Object.values(s.squadre)) for (const a of sq.rosa) assegnati.add(a.idGiocatore);
+    const inCoda = new Set(s.coda);
+    const out = {};
+    for (const g of s.lista) {
+      if (assegnati.has(g.id) || g.id === s.correnteId) continue;
+      const gruppo = out[g.ruolo] || (out[g.ruolo] = { inCoda: [], svincolati: [] });
+      const voce = { nome: g.nome, squadra: g.squadra || "", quotazioneBase: g.quotazioneBase };
+      if (inCoda.has(g.id)) gruppo.inCoda.push(voce);
+      else if (s.nonVenduti.includes(g.id)) gruppo.svincolati.push(voce);
+    }
+    return out;
   }
 
   /** Giocatori LIBERI (non assegnati, non all'asta adesso) per l'assegnazione manuale. */
@@ -1154,8 +1296,8 @@ function creaServer(opzioni = {}) {
     broadcast();
   }
 
-  const server = http.createServer((req, res) => {
-    try { gestisci(req, res); } catch (e) {
+  const server = http.createServer(async (req, res) => {
+    try { await gestisci(req, res); } catch (e) {
       console.error("[errore]", e);
       if (!res.headersSent) {
         res.writeHead(500, { "Content-Type": "application/json" });
@@ -1238,6 +1380,13 @@ function creaServer(opzioni = {}) {
       return json(res, 200, { porta: server.address().port, ips: ipLan() });
     }
 
+    // giocatori non ancora assegnati, reparto per reparto (pannello dei
+    // partecipanti): dati pubblici — nomi della lista e coda, zero offerte
+    if (req.method === "GET" && p === "/api/liberi") {
+      if (!sessione.avviata || !sessione.motore.stato) return json(res, 200, { perRuolo: null });
+      return json(res, 200, { perRuolo: liberiPerRuolo() });
+    }
+
     if (req.method === "GET" && p === "/api/esporta.csv") {
       if (u.searchParams.get("pin") !== sessione.pin) {
         const ip = ipDi(req);
@@ -1269,6 +1418,26 @@ function creaServer(opzioni = {}) {
         res.end(xlsxBuf);
       } catch (e) {
         json(res, 500, { errore: "Generazione Excel fallita: " + e.message });
+      }
+      return;
+    }
+
+    if (req.method === "GET" && p === "/api/esporta.offerte.xlsx") {
+      if (u.searchParams.get("pin") !== sessione.pin) {
+        const ip = ipDi(req);
+        if (pinBloccato(ip)) return json(res, 429, { errore: "Troppi tentativi PIN: attendi un minuto" });
+        registraPinErrato(ip);
+        return json(res, 403, { errore: "PIN banditore errato" });
+      }
+      try {
+        const xlsxBuf = generaXlsxOfferte(sessione.motore.stato);
+        res.writeHead(200, {
+          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": 'attachment; filename="asta_offerte.xlsx"',
+        });
+        res.end(xlsxBuf);
+      } catch (e) {
+        json(res, 500, { errore: "Generazione Excel offerte fallita: " + e.message });
       }
       return;
     }
@@ -1319,7 +1488,7 @@ function creaServer(opzioni = {}) {
         nuova.quote = { P: c.quote.P, D: c.quote.D, C: c.quote.C, A: c.quote.A };
       if (Array.isArray(c.ordineRuoli) && new Set(c.ordineRuoli).size === 4 && c.ordineRuoli.every((r) => "PDCA".includes(r)))
         nuova.ordineRuoli = c.ordineRuoli;
-      for (const k of ["regolaResto", "baseComeMinimo", "ordineCasuale"])
+      for (const k of ["regolaResto", "baseComeMinimo", "ordineCasuale", "battute"])
         if (typeof c[k] === "boolean") nuova[k] = c[k];
       sessione.config = nuova;
       dopoMossa();
@@ -1380,12 +1549,21 @@ function creaServer(opzioni = {}) {
 
     if (p === "/api/azione") {
       if (!pinOk) return json(res, 403, { errore: "PIN banditore errato" });
+      // le battute del banditore si accendono/spegono in QUALSIASI momento,
+      // anche prima dell'avvio (regola di voce, non regola di gioco)
+      if (String(dati.azione || "") === "battute") {
+        sessione.config.battute = dati.valore !== false;
+        if (sessione.motore.stato) sessione.motore.stato.config.battute = sessione.config.battute;
+        dopoMossa();
+        return json(res, 200, { ok: true, battute: sessione.config.battute });
+      }
       if (!sessione.avviata) return json(res, 400, { errore: "Asta non avviata" });
       const azione = String(dati.azione || "");
       let esito;
       switch (azione) {
         case "forza": esito = sessione.motore.forzaChiusura(); break;
         case "salta": esito = sessione.motore.salta(); break;
+        case "chiudiReparto": esito = sessione.motore.chiudiReparto(); break;
         case "prossimo":
           try { sessione.motore.prossimo(); esito = { ok: true }; } catch (e) { esito = { ok: false, errore: e.message }; }
           break;
@@ -1490,7 +1668,7 @@ if (require.main === module) {
   server.listen(porta, "0.0.0.0", () => {
     const ips = ipLan();
     console.log("=".repeat(64));
-    console.log("  ASTA BUSTA CHIUSA — server della serata");
+    console.log("  FANTASTA — ASTA REALTIME · server della serata");
     console.log("=".repeat(64));
     console.log(`  PIN BANDITORE:  ${server.sessione.pin}   (ti serve nella pagina /banditore)`);
     console.log(`  (questo PIN resta lo stesso ad ogni riavvio: conservato in data/pin.txt)`);

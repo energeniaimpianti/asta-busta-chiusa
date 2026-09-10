@@ -113,6 +113,15 @@ const ok = (msg) => { CHECK++; console.log("OK " + msg); };
     assert(toggle.visibile && toggle.checked, "toggle «Questo dispositivo parla» visibile e attivo");
     assert(!!(await pagA.$("#prova-voce")), "bottone Prova voce presente");
     ok("modalità telefonino: toggle voce attivo, bottone Prova presente");
+    // INTERRUTTORE BATUTE (10/09): visibile, acceso; si spegne e si riaccende,
+    // il flag arriva a tutte le pagine del banditore (vive sul server)
+    const tgBat = await pagA.$eval("#voce-battute", (c) => ({ checked: c.checked, visibile: !!c.offsetParent }));
+    assert(tgBat.visibile && tgBat.checked, "toggle «Battute» visibile e attivo di default");
+    await pagA.click("#voce-battute");
+    await pagA.waitForFunction(() => vista && vista.config && vista.config.battute === false, { timeout: 8000 });
+    await pagA.click("#voce-battute");
+    await pagA.waitForFunction(() => vista && vista.config && vista.config.battute === true, { timeout: 8000 });
+    ok("toggle «Battute 🎭»: spento/riacceso, flag sincronizzato sul server");
     await pagA.screenshot({ path: "../.tools/e2e_banditore_setup.png" });
 
     // ------------------------------------------------ avvio (con conferma nativa)
@@ -228,10 +237,20 @@ const ok = (msg) => { CHECK++; console.log("OK " + msg); };
     ok("avanzamento a Kean");
 
     // ------------------------------------------------ Kean: busta sola + forza → passi menzionati
+    // TENDINE CHE RESTANO (10/09): «Rose avversarie» aperta NON si richiude al
+    // broadcast della busta consegnata (prima il re-render la collassava);
+    // e Passo/Consegna stanno SOPRA la tastiera: giocatore e Passo nella stessa vista
+    const zaino = await pagB.$eval("#passo", (b) => { const r = b.getBoundingClientRect(); const pad = document.querySelector(".pad").getBoundingClientRect(); return { sopra: r.bottom <= pad.top, visibile: r.top >= 0 && r.bottom <= innerHeight, h: r.height }; });
+    assert(zaino.sopra, "il tasto Passo sta sopra la tastiera");
+    assert(zaino.visibile, "nome giocatore + Passo visibili senza scorrere (viewport telefono)");
+    await pagB.click('details[data-tendina="avversarie"] summary');
+    await pagB.waitForFunction(() => document.querySelector('details[data-tendina="avversarie"]').open === true, { timeout: 8000 });
     await pagB.click('.pad button[data-t="3"]');
     await pagB.click('.pad button[data-t="0"]');
     await pagB.click("#consegna");
-    await pagB.waitForFunction(() => document.body.innerText.includes("Busta consegnata"), { timeout: 8000 });
+    await pagB.waitForFunction(() => document.body.innerText.includes("Busta consegnata")
+      && document.querySelector('details[data-tendina="avversarie"]').open === true, { timeout: 8000 });
+    ok("tendina «Rose avversarie» aperta resta APERTA dopo il broadcast; Passo sopra il pad e in vista");
     await pagA.click('[data-azione="forza"]');
     await pagA.waitForFunction(() => document.body.innerText.includes("🏆"), { timeout: 20000 });
     tA2 = (await testo(pagA)).replace(/\s+/g, " ");
@@ -273,14 +292,19 @@ const ok = (msg) => { CHECK++; console.log("OK " + msg); };
     await pagA.screenshot({ path: "../.tools/e2e_banditore_spareggio.png" });
 
     // ------------------------------------------------ annulla ultima aggiudicazione
-    // budget di Giovanni letto dall'header del suo telefono: 500 - 44 (Lautaro) - 30 (Kean) - 32 (Vlahovic) = 394
-    await pagB.waitForFunction(() => document.body.innerText.includes("394 FMM"), { timeout: 8000 });
+    // CREDITI SOSPESI (10/09): durante la rivelazione di Vlahovic (32) il telefono
+    // di Giovanni NON mostra ancora l'acquisto: budget fermo a 426 (500−44−30) —
+    // i crediti si aggiornano solo dopo la proclamazione, al round successivo
+    await pagB.waitForFunction(() => document.body.innerText.includes("426 FMM"), { timeout: 8000 });
+    const budgetSospeso = await pagB.evaluate(() => vista.budgetResiduo);
+    assert(budgetSospeso === 426, "budget sospeso durante la proclamazione: " + budgetSospeso);
+    ok("suspense nei dati: durante la rivelazione i crediti restano a 426 (acquisto non ancora proclamato)");
     await pagA.click('[data-azione="annulla"]');
     await pagA.waitForFunction(() => document.body.innerText.includes("Vlahovic") && !document.body.innerText.includes("Annuncio:"), { timeout: 8000 });
-    // annullato Vlahovic (32): il budget torna 426 e la fase riapre le buste
-    await pagB.waitForFunction(() => document.body.innerText.includes("426 FMM"), { timeout: 8000 });
+    // annullato Vlahovic (32): il budget REALE torna 426 e la fase riapre le buste
+    await pagB.waitForFunction(() => document.body.innerText.includes("426 FMM") && document.body.innerText.includes("Vlahovic"), { timeout: 8000 });
     assert((await testo(pagB)).includes("Vlahovic"), "Vlahovic di nuovo all'asta sul telefono");
-    ok("annullamento: Vlahovic torna all'asta, budget ripristinato 394→426");
+    ok("annullamento: Vlahovic torna all'asta, budget ripristinato (426, com'era prima del round)");
 
     // ------------------------------------------------ salta → non venduto col motivo giusto
     await pagA.click('[data-azione="salta"]');
@@ -292,15 +316,35 @@ const ok = (msg) => { CHECK++; console.log("OK " + msg); };
     assert(!VOCE.COMMENTI_NON_VENDUTO.some((f) => annSal.includes(f)), "niente prese in giro quando salta il banditore");
     ok("salta: non venduto col motivo vero, annuncio senza falsi «nessuno lo vuole»");
 
-    // ------------------------------------------------ termine + Excel multi-foglio
+    // ------------------------------------------------ chiudi reparto (10/09)
     await pagA.click('[data-azione="prossimo"]');
-    await pagA.waitForFunction(() => document.body.innerText.includes("Pulisic") || document.body.innerText.includes("Asta conclusa"), { timeout: 8000 });
+    await pagA.waitForFunction(() => document.body.innerText.includes("Pulisic"), { timeout: 8000 });
+    // il pannello «liberi» vede Retegui in coda ma NON Pulisic (è all'asta adesso)
+    const rLiberi = await api("/api/liberi");
+    assert(rLiberi.stato === 200 && rLiberi.j.perRuolo, "endpoint liberi");
+    const nomiInCodaA = rLiberi.j.perRuolo.A.inCoda.map((g) => g.nome);
+    assert(nomiInCodaA.includes("Retegui"), "Retegui (reinserito) in coda nel reparto A");
+    assert(!nomiInCodaA.includes("Pulisic"), "il giocatore all'asta non è «libero»");
+    // il tasto mostra il reparto e i giocatori rimasti
+    const etichettaChiudi = await pagA.$eval('[data-azione="chiudiReparto"]', (b) => b.textContent.trim());
+    assert(etichettaChiudi.includes("Attaccanti"), "tasto chiudi reparto col nome reparto: " + etichettaChiudi);
+    await pagA.click('[data-azione="chiudiReparto"]');
+    await pagA.waitForFunction(() => document.body.innerText.includes("reparto chiuso dal banditore"), { timeout: 8000 });
+    tA2 = (await testo(pagA)).replace(/\s+/g, " ");
+    assert(tA2.slice(tA2.indexOf("Annuncio:")).includes("Reparto chiuso"), "la voce annuncia la chiusura del reparto");
+    await pagA.click('[data-azione="prossimo"]');
+    // reparto A chiuso: Retegui svincolato SENZA passare dallo schermo → si salta ai centrocampisti
+    await pagA.waitForFunction(() => document.body.innerText.includes("Barella"), { timeout: 8000 });
+    ok("chiudi reparto: Pulisic+Retegui svincolati, annuncio secco, salto diretto ai Centrocampisti");
+
+    // ------------------------------------------------ termine + Excel multi-foglio
     // TERMINA è ripiegato: prima si apre il pannello dei comandi rari, poi si preme
     await pagA.click(".comandi-rari summary");
     await pagA.click('[data-azione="termina"]');
     await pagA.waitForFunction(() => document.body.innerText.includes("Asta conclusa"), { timeout: 8000 });
     assert((await testo(pagA)).includes("SCARICA EXCEL COMPLETO (5 fogli)"), "link Excel nella schermata fine");
-    ok("serata terminata (dai comandi rari): schermata fine con link Excel");
+    assert((await testo(pagA)).includes("SCARICA TUTTE LE OFFERTE"), "link offerte nella schermata fine");
+    ok("serata terminata (dai comandi rari): schermata fine con link Excel e link Offerte");
     await pagA.screenshot({ path: "../.tools/e2e_banditore_fine.png" });
 
     // ------------------------------------------------ regie del banditore a fine asta
@@ -328,8 +372,9 @@ const ok = (msg) => { CHECK++; console.log("OK " + msg); };
     assert(tRosab.includes("Kean") && !tRosab.includes("Lautaro Martinez"), "rosa di Giovanni senza Lautaro, con Kean");
     ok("regie: crediti Bruno → 333, Lautaro annullato (Giovanni rimborsato → 470)");
     // assegnazione manuale: un giocatore ancora libero a Bruno, al prezzo che decide il banditore
-    // (dopo il ridisegno del setBudget le regie si sono richiuse: si riaprono)
-    await pagA.click(".regie summary");
+    // (col fix delle tendine le regie RESTANO aperte dopo il ridisegno: si apre solo se serve)
+    const regieAperte = await pagA.$eval(".regie", (d) => d.open);
+    if (!regieAperte) await pagA.click(".regie summary");
     const libero = await pagA.$$eval("#regia-liberi option", (os) => os.map((o) => o.value));
     assert(libero.length > 0, "ci sono giocatori liberi da assegnare");
     await pagA.type("#regia-giocatore", "Pulisic");
@@ -356,6 +401,21 @@ const ok = (msg) => { CHECK++; console.log("OK " + msg); };
     assert(voci["xl/worksheets/sheet3.xml"].toString("utf8").includes("ANNULLATO"), "annullamento tracciato nel foglio Asta completa");
     assert(voci["xl/worksheets/sheet2.xml"].toString("utf8").includes("330"), "crediti corretti (330 = 333 meno l assegnazione manuale) nel foglio Riepilogo");
     ok("Excel multi-foglio: 5 fogli, ANNULLATO e crediti 333 tracciati (" + Math.round(buf.length / 1024) + " KB)");
+
+    // ------------------------------------------------ file OFFERTE ordinato (10/09)
+    const rO = await fetch(BASE + "/api/esporta.offerte.xlsx?pin=" + PIN);
+    assert(rO.status === 200, "download offerte");
+    const bufO = Buffer.from(await rO.arrayBuffer());
+    assert(bufO.readUInt16LE(0) === 0x4b50, "offerte: zip valido");
+    const vociO = unzip(bufO);
+    assert(vociO["xl/workbook.xml"].toString("utf8").includes("Offerte"), "foglio Offerte presente");
+    const xmlO = vociO["xl/worksheets/sheet1.xml"].toString("utf8");
+    assert(xmlO.includes("Lautaro Martinez"), "giocatore nel foglio offerte");
+    assert(xmlO.includes("Giovanni") && xmlO.includes("AGGIUDICATA"), "busta vincente marcata AGGIUDICATA");
+    assert(xmlO.includes("passo"), "i passi tracciati");
+    assert(xmlO.includes("Spareggio 1"), "il giro di spareggio di Vlahovic marcato");
+    assert((await fetch(BASE + "/api/esporta.offerte.xlsx?pin=0000")).status === 403, "offerte protette dal PIN");
+    ok("file OFFERTE: ogni busta con fase ed esito, spareggi marcati, PIN protetto (" + Math.round(bufO.length / 1024) + " KB)");
 
     console.log("\n=== E2E COMPLETO SUPERATO — " + CHECK + " checkpoint ===");
   } catch (e) {

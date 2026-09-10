@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0e1a12">
-<title>Asta Busta Chiusa — Partecipante</title>
+<title>FantAsta — Asta Realtime · Partecipante</title>
 <style>
   :root { --verde:#2ecc71; --verdeScuro:#1b5e20; --card:#152a1b; --bg:#0e1a12; --testo:#eaf5ec; --muto:#8fa898; --rosso:#e74c3c; --giallo:#f1c40f; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -94,11 +94,16 @@
   .pad { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:14px 0; }
   .pad button { padding:18px 0; font-size:26px; font-weight:800; border:0; border-radius:14px; background:#1d3625; color:var(--testo); }
   .pad button:active { background:var(--verdeScuro); transform:scale(.95); }
-  /* Passo e Consegna in due zone distanti: impossibile sbagliare tocco */
-  .riga-buste { display:grid; grid-template-columns:1fr 1.55fr; gap:18px; align-items:stretch; margin-top:4px; }
-  .riga-buste #passo { font-size:15px; padding:14px 6px; }
-  .riga-buste #consegna { font-size:18px; }
+  /* Passo e Consegna SOPRA la tastiera (10/09): nome giocatore e tasto Passo
+     si vedono nella stessa schermata senza scorrere, su telefono e tablet */
+  .riga-buste { display:grid; grid-template-columns:1fr 1.55fr; gap:18px; align-items:stretch; margin:4px 0 14px; }
+  .riga-buste #passo { font-size:15px; padding:16px 6px; }
+  .riga-buste #consegna { font-size:18px; padding:16px 4px; }
   @media (min-width:780px) { .riga-buste { gap:28px; } .riga-buste #passo { font-size:17px; } .riga-buste #consegna { font-size:20px; } }
+  /* pannello «ancora liberi»: chip compatti, svincolati spenti */
+  .chip-libero { display:inline-block; margin:3px; padding:5px 10px; border-radius:999px; background:#1d3625; font-size:13px; }
+  .chip-libero b { color:#9be7ae; margin-left:6px; }
+  .chip-libero.svincolato { opacity:.45; text-decoration:line-through; }
   .display { text-align:center; font-size:52px; font-weight:900; min-height:64px; }
   .chip { display:inline-block; padding:4px 10px; margin:3px; border-radius:999px; background:#1d3625; font-size:13px; }
   .chip.ok { background:#1c4a26; color:#9be7ae; }
@@ -162,6 +167,12 @@ function riceviVista(v) {
   _siglaVista = sigla;
   vista = v;
   render();
+  // pannello «ancora liberi» aperto: i dati seguono il round (senza zavorrare
+  // la vista SSE coi nomi di tutta la lista)
+  if (v && v.fase === "ATTESA_OFFERTE" && v.roundId !== _roundLiberi && tendineAperte.liberi) {
+    _roundLiberi = v.roundId;
+    caricaLiberi(false);
+  }
 }
 function connetti() {
   if (usoPoll) return; // già in polling di fallback (l'URL segue il pid corrente)
@@ -209,11 +220,41 @@ function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, (c) => (
 
 // ------------------------------------------------------------------ viste
 
+// TENDINE CHE RESTANO (10/09): ogni <details> ha una chiave stabile; lo stato
+// aperto/chiuso vive qui e il re-render lo RIAPPLICA — un tasto la apre, lo
+// stesso tasto la chiude, nessun timer, nessuna chiusura per un broadcast
+const tendineAperte = {};
+document.addEventListener("toggle", (e) => {
+  const d = e.target;
+  if (d && d.dataset && d.dataset.tendina) tendineAperte[d.dataset.tendina] = d.open;
+}, true);
+function ripristinaTendine() {
+  document.querySelectorAll("details[data-tendina]").forEach((d) => {
+    if (tendineAperte[d.dataset.tendina] !== undefined) d.open = tendineAperte[d.dataset.tendina];
+  });
+}
+
+// giocatori ancora liberi, reparto per reparto (10/09): si scaricano SOLO quando
+// il pannello è aperto — la vista SSE resta leggera
+let liberiCache = null, _roundLiberi = -1;
+async function caricaLiberi(annullaRound) {
+  try {
+    const r = await fetch("/api/liberi");
+    liberiCache = await r.json();
+    if (annullaRound) _roundLiberi = vista ? vista.roundId : -1;
+    if (tendineAperte.liberi) render();
+  } catch (_) { /* riproverà alla prossima apertura */ }
+}
+document.addEventListener("click", (e) => {
+  const s = e.target.closest("summary");
+  if (s && s.parentElement && s.parentElement.dataset.tendina === "liberi" && !s.parentElement.open) caricaLiberi(true);
+});
+
 function render() {
   if (!vista) return;
   if (vista.escluso) { $app.innerHTML = schermataNome("L'asta è già iniziata e questo nome non risulta registrato. Se ti sei disconnesso, rientra col <b>tuo stesso nome</b>."); return; }
   if (vista.preAvvio || !vista.fase) { $app.innerHTML = schermataPre(); return; }
-  if (vista.fase === "FINE") { $app.innerHTML = schermataFine(); return; }
+  if (vista.fase === "FINE") { $app.innerHTML = schermataFine(); ripristinaTendine(); return; }
   let html = "";
   html += intestazione();
   if (vista.fase === "RIVELAZIONE") html += pannelloRivelazione();
@@ -222,8 +263,10 @@ function render() {
   html += pannelloMercato();
   html += `</div><div>`;
   html += pannelloSquadre();
+  html += pannelloLiberi();
   html += `</div></div>`;
   $app.innerHTML = html;
+  ripristinaTendine();
 }
 
 function intestazione() {
@@ -257,7 +300,7 @@ function intestazione() {
 
 function schermataNome(msg) {
   return `<div class="card">
-    <h1>⚽ Asta Busta Chiusa</h1>
+    <h1>⚽ FantAsta — Asta Realtime</h1>
     <p class="muto">${msg || "Scrivi il tuo nome: è con questo che il banditore ti riconoscerà."}</p>
     <input type="text" id="nome" maxlength="30" placeholder="Il tuo nome" value="${esc(mioNome)}" autocomplete="off">
     <div style="height:12px"></div>
@@ -299,28 +342,32 @@ function pannelloAsta() {
     </div>`;
   }
 
-  const consegnate = (vista.hannoConsegnato || []).length;
-  html += `<div class="card">
-    <div class="muto">Buste consegnate: <b>${consegnate}</b></div>
-    ${(vista.hannoConsegnato || []).map((n) => `<span class="chip ok">✅ ${esc(n)}</span>`).join("")}
-  </div>`;
-
   if (vista.daConsegnare && vista.mioStato === "IN_ATTESA") {
     const min = inSpareggio ? vista.spareggio.min : vista.minOfferta;
+    // ordine (10/09): display → PASSO/CONSEGNA → tastiera. Così nome giocatore
+    // e tasto Passo stanno nella stessa schermata anche sul telefonino
     html += `<div class="card">
       <div class="display" id="display">${cifra || "—"}</div>
-      <div class="muto centro">${inSpareggio
+      <div class="muto centro" style="margin-bottom:10px">${inSpareggio
         ? `min ${min} (puoi ripetere la tua puntata) · max ${vista.maxOfferta}`
         : `min ${vista.minOfferta} · max ${vista.maxOfferta} · 0 = passo`}</div>
-      <div class="pad">${["1","2","3","4","5","6","7","8","9","0","⌫","C"].map((t) =>
-        `<button data-t="${t}">${t}</button>`).join("")}</div>
       <div class="riga-buste">
         <button class="btn btn-secondario" id="passo">Passo (0)</button>
         <button class="btn" id="consegna">Consegna busta</button>
       </div>
+      <div class="pad">${["1","2","3","4","5","6","7","8","9","0","⌫","C"].map((t) =>
+        `<button data-t="${t}">${t}</button>`).join("")}</div>
+    </div>`;
+    const consegnate = (vista.hannoConsegnato || []).length;
+    html += `<div class="card">
+      <div class="muto">Buste consegnate: <b>${consegnate}</b></div>
+      ${(vista.hannoConsegnato || []).map((n) => `<span class="chip ok">✅ ${esc(n)}</span>`).join("")}
     </div>`;
   } else if (vista.mioStato === "PUNTATO") {
     html += `<div class="card centro pop"><div style="font-size:44px">✅</div><b>Busta consegnata.</b><br><span class="muto">Nessuno può vedere la tua offerta. Aspetta le altre buste.</span></div>`;
+    const consegnate = (vista.hannoConsegnato || []).length;
+    html += `<div class="card"><div class="muto">Buste consegnate: <b>${consegnate}</b></div>
+      ${(vista.hannoConsegnato || []).map((n) => `<span class="chip ok">✅ ${esc(n)}</span>`).join("")}</div>`;
   } else if (vista.mioStato === "ESCLUSO_REPARTO") {
     html += `<div class="card centro"><b>🚫 Reparto completo</b><br><span class="muto">Hai già riempito questo reparto: per questo giocatore non puoi puntare.</span></div>`;
   } else if (vista.mioStato === "FUORI_BUDGET") {
@@ -334,13 +381,28 @@ function pannelloAsta() {
 let rivelati = 0;
 let timerRiv = null;
 // ritmo da tavolo da poker: una busta ogni ~1.1s in ordine crescente, poi
-// due passi di silenzio (tutte le buste sul tavolo) prima del verdetto
-const PASSO_BUSTA = 1100, PASSI_SILENZIO = 2;
+// due passi di silenzio (tutte le buste sul tavolo) prima del verdetto.
+// LE ULTIME DUE BUSTE RALLENTANO INSIEME (10/09): è lì che si decide tutto —
+// rallentare solo la più alta svelerebbe il vincitore per esclusione
+const PASSO_BUSTA = 1100, PASSO_FINALE = 2600, PASSI_SILENZIO = 2;
+function fermaRitmo() { if (timerRiv) { clearTimeout(timerRiv); timerRiv = null; } }
+function avviaRitmo(tot) {
+  fermaRitmo();
+  const passo = () => {
+    rivelati++;
+    applicaVis();
+    if (rivelati >= tot + PASSI_SILENZIO) { timerRiv = null; return; }
+    const i = rivelati; // indice della PROSSIMA busta da aprire
+    timerRiv = setTimeout(passo, i >= tot - 2 && i < tot ? PASSO_FINALE : PASSO_BUSTA);
+  };
+  // anche la prima busta rallenta se è già una delle ultime due (round da 1-2 buste)
+  timerRiv = setTimeout(passo, tot <= 2 ? PASSO_FINALE : PASSO_BUSTA);
+}
 function pannelloRivelazione() {
   const r = vista.rivelazione;
   if (!r) return "";
   const tot = r.offerteInOrdine.length + (r.storiaSpareggi || []).reduce((a, g) => a + g.length, 0) + (r.spareggio || []).length + (r.spareggi > 0 ? 1 : 0);
-  if (window._ultRound !== vista.roundId) { window._ultRound = vista.roundId; rivelati = 0; clearInterval(timerRiv); timerRiv = setInterval(() => { if (rivelati < tot + PASSI_SILENZIO) { rivelati++; applicaVis(); } }, PASSO_BUSTA); }
+  if (window._ultRound !== vista.roundId) { window._ultRound = vista.roundId; rivelati = 0; avviaRitmo(tot); }
   let html = `<div class="card">
     <div class="muto centro">Asta chiusa per</div>
     <div class="giocatore-nome">${esc(r.giocatore.nome)}</div>
@@ -429,7 +491,7 @@ function pannelloMercato() {
     return `${r} ${m}`;
   }).join(" · ");
 
-  return `<details open><summary style="cursor:pointer;font-weight:700;padding:8px 0;">📊 Mercato in tempo reale</summary>
+  return `<details data-tendina="mercato" open><summary style="cursor:pointer;font-weight:700;padding:8px 0;">📊 Mercato in tempo reale</summary>
   <div class="card" style="overflow-x:auto;">
     <table class="mercato-table">
       <tr><th></th><th style="text-align:right;">Budget</th>${ordine.map((r) => `<th>${r}</th>`).join("")}</tr>
@@ -442,8 +504,10 @@ function pannelloMercato() {
 function pannelloSquadre() {
   if (!vista.squadre) return "";
   const mie = vista.squadre.find((s) => s.id === vista.pid);
+  const quote = vista.config.quote || { P: 3, D: 8, C: 8, A: 6 };
 
-  // helper: genera la rosa di una squadra raggruppata per ruolo
+  // helper: genera la rosa di una squadra raggruppata per ruolo, con i crediti
+  // spesi per reparto coerenti con la visione (10/09)
   function rosaHtml(sq, isMia) {
     if (!sq.rosa.length) return `<div class="muto" style="padding:6px 0;">Nessun acquisto ancora.</div>`;
     const ordine = { P: [], D: [], C: [], A: [] };
@@ -451,7 +515,8 @@ function pannelloSquadre() {
     let h = "";
     for (const r of ["P", "D", "C", "A"]) {
       if (ordine[r].length) {
-        h += `<div style="padding:4px 0 2px;font-size:11px;font-weight:700;color:${getColorRuolo(r)};">${r} (${ordine[r].length})</div>`;
+        const speso = ordine[r].reduce((somma, a) => somma + a.importo, 0);
+        h += `<div style="padding:4px 0 2px;font-size:11px;font-weight:700;color:${getColorRuolo(r)};">${r} ${ordine[r].length}/${quote[r] || "?"} · spesi ${speso} FMM</div>`;
         for (const a of ordine[r]) {
           h += `<div class="rosa-riga" style="${isMia ? "font-weight:600;" : ""}"><span>${esc(a.nome)}</span><b style="color:${a.importo > 25 ? "#ef9a9a" : a.importo > 12 ? "#ffcc80" : "#a5d6a7"};">${a.importo}</b></div>`;
         }
@@ -464,26 +529,55 @@ function pannelloSquadre() {
     return { P: "#f9a825", D: "#64b5f6", C: "#81c784", A: "#ef9a9a" }[r] || "#888";
   }
 
-  // la mia squadra (sempre visibile, non richiudibile su PC)
-  let html = `<details open><summary style="cursor:pointer;font-weight:700;padding:8px 0;">📋 La mia squadra (${mie ? mie.rosa.length : 0}/25 · 💰 ${mie ? mie.budgetResiduo : 0} FMM)</summary><div class="card">`;
+  // la mia squadra (aperta di default: la chiudo/riapro col suo tasto)
+  let html = `<details data-tendina="mia-squadra" open><summary style="cursor:pointer;font-weight:700;padding:8px 0;">📋 La mia squadra (${mie ? mie.rosa.length : 0}/25 · 💰 ${mie ? mie.budgetResiduo : 0} FMM)</summary><div class="card">`;
   html += rosaHtml(mie, true);
   html += `</div></details>`;
 
-  // squadre avversarie: con rose complete, richiudibili
+  // squadre avversarie: con rose complete e spese per reparto, richiudibili
   const altri = vista.squadre.filter((s) => s.id !== vista.pid);
-  html += `<details><summary style="cursor:pointer;font-weight:700;padding:8px 0;">👀 Rose avversarie (${altri.length} squadre)</summary>`;
+  html += `<details data-tendina="avversarie"><summary style="cursor:pointer;font-weight:700;padding:8px 0;">👀 Rose avversarie (${altri.length} squadre)</summary>`;
   for (const sq of altri) {
     const speso = sq.rosa.reduce((a, x) => a + x.importo, 0);
-    html += `<details style="margin:6px 0;"><summary style="cursor:pointer;padding:8px 12px;background:#152a1b;border-radius:10px;display:flex;justify-content:space-between;align-items:center;">
+    html += `<details data-tendina="squadra-${sq.id}"><summary style="cursor:pointer;padding:8px 12px;background:#152a1b;border-radius:10px;display:flex;justify-content:space-between;align-items:center;">
       <span style="font-weight:700;">${esc(sq.nome)}</span>
       <span style="font-size:12px;color:#8fa898;">${sq.rosa.length}/25 · 💰${sq.budgetResiduo}</span>
     </summary>
     <div class="card" style="margin-top:4px;padding:10px;">
       ${rosaHtml(sq, false)}
+      <div class="muto" style="margin-top:6px;">Speso in tutto: ${speso} FMM</div>
     </div></details>`;
   }
   html += `</details>`;
   return html;
+}
+
+/** Giocatori ANCORA LIBERI, reparto per reparto (10/09): «in coda» arriveranno
+ *  all'asta nell'ordine mostrato; gli svincolati sono passati definitivamente.
+ *  I nomi si scaricano da /api/liberi solo quando il pannello è aperto. */
+function pannelloLiberi() {
+  const st = vista.statistiche || {};
+  const ordine = vista.config.ordineRuoli || ["P", "D", "C", "A"];
+  const nomiRuolo = { P: "Portieri", D: "Difensori", C: "Centrocampisti", A: "Attaccanti" };
+  const conteggi = ordine.map((r) => `${r} ${(st[r] && st[r].inCoda) || 0}+${(st[r] && st[r].svincolati) || 0}`).join(" · ");
+  let corpo = `<div class="muto" style="padding:8px 2px;">Apri per vedere chi non è ancora stato assegnato (${esc(conteggi)}: in coda + svincolati).</div>`;
+  if (tendineAperte.liberi) {
+    if (!liberiCache || !liberiCache.perRuolo) corpo = `<div class="muto" style="padding:8px 2px;">Carico l'elenco…</div>`;
+    else {
+      corpo = ordine.map((r) => {
+        const gruppo = liberiCache.perRuolo[r];
+        if (!gruppo || (!gruppo.inCoda.length && !gruppo.svincolati.length)) return "";
+        const inCoda = gruppo.inCoda.map((g) => `<span class="chip-libero">${esc(g.nome)}<b>${g.quotazioneBase}</b></span>`).join("");
+        const svin = gruppo.svincolati.map((g) => `<span class="chip-libero svincolato">${esc(g.nome)}</span>`).join("");
+        return `<div style="padding:6px 0;">
+          <div style="font-size:11px;font-weight:700;color:${{ P: "#f9a825", D: "#64b5f6", C: "#81c784", A: "#ef9a9a" }[r]};">${nomiRuolo[r]} — in coda ${gruppo.inCoda.length} · svincolati ${gruppo.svincolati.length}</div>
+          ${inCoda}${svin}
+        </div>`;
+      }).join("") || `<div class="muto" style="padding:8px 2px;">Nessun giocatore libero: è tutto assegnato.</div>`;
+    }
+  }
+  return `<details data-tendina="liberi"><summary style="cursor:pointer;font-weight:700;padding:8px 0;">🕳 Giocatori ancora liberi</summary>
+    <div class="card">${corpo}</div></details>`;
 }
 
 function schermataFine() {

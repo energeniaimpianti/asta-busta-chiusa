@@ -102,12 +102,15 @@ test("voce: si leggono solo le 3-4 offerte più alte, mai le più basse", () => 
 });
 
 // ------------------------------------------------------------ trigger categorie
-// rng costante: 0.7 -> struttura 3 (commento sempre); 0.5 -> struttura 2; 0.1 -> struttura 0; 0.9 -> struttura 4
+// RNG_BATTUTA = () => 0: struttura 0 e probabilità-battuta 0 < 0.2 → la battuta
+// è SEMPRE presente. Dal 10/09 le battute sono una su cinque (45% sui costosi):
+// con un rng costante alto, tipo 0.7, la battuta NON scatta più.
+const RNG_BATTUTA = () => 0;
 
 test("voce: premio alto (p>=25, margine largo) -> solo COMMENTI_ALTI", () => {
   const { generaAnnuncio, POOL } = motoreFresco();
   const r = riv({ offerteInOrdine: [off("Dario", 10), off("Franco", 44)], vincitore: "Franco", importoFinale: 44 });
-  const ann = generaAnnuncio(r, () => 0.7);
+  const ann = generaAnnuncio(r, RNG_BATTUTA);
   const v = { giocatore: "Rossi", nome: "Franco", prezzo: 44 };
   assert.ok(contieneUna(ann, riempi(POOL.COMMENTI_ALTI, v)), "manca commento alto: " + ann);
   assert.ok(!contieneUna(ann, riempi(POOL.COMMENTI_ECONOMICI, v)), "commento economico indebito: " + ann);
@@ -118,7 +121,7 @@ test("voce: premio alto (p>=25, margine largo) -> solo COMMENTI_ALTI", () => {
 test("voce: vittoria risicata (margine 1-3, prezzo medio) -> solo COMMENTI_RISICATI", () => {
   const { generaAnnuncio, POOL } = motoreFresco();
   const r = riv({ offerteInOrdine: [off("Dario", 10), off("Franco", 12)], vincitore: "Franco", importoFinale: 12 });
-  const ann = generaAnnuncio(r, () => 0.7);
+  const ann = generaAnnuncio(r, RNG_BATTUTA);
   const v = { giocatore: "Rossi", nome: "Franco", prezzo: 12 };
   assert.ok(contieneUna(ann, riempi(POOL.COMMENTI_RISICATI, v)), "manca commento risicato: " + ann);
   assert.ok(!contieneUna(ann, riempi(POOL.COMMENTI_ALTI, v)), "commento alto indebito: " + ann);
@@ -133,7 +136,7 @@ test("voce: alto E risicato insieme (spareggio 44-42) -> RISICATI + ALTI, e lo s
     vincitore: "Franco", importoFinale: 44, spareggi: 1,
     spareggio: [off("Dario", 42), off("Franco", 44)],
   });
-  const ann = generaAnnuncio(r, () => 0.7);
+  const ann = generaAnnuncio(r, RNG_BATTUTA);
   const v = { giocatore: "Rossi", nome: "Franco", prezzo: 44 };
   assert.ok(contieneUna(ann, riempi(POOL.COMMENTI_RISICATI, v)), "manca commento risicato: " + ann);
   assert.ok(contieneUna(ann, riempi(POOL.COMMENTI_ALTI, v)), "manca commento alto: " + ann);
@@ -149,7 +152,7 @@ test("voce: margine risicato calcolato sull'ULTIMO spareggio (FIX #1): 20-20 poi
     vincitore: "Franco", importoFinale: 30, spareggi: 1,
     spareggio: [off("Dario", 28), off("Franco", 30)],
   });
-  const ann = generaAnnuncio(r, () => 0.7);
+  const ann = generaAnnuncio(r, RNG_BATTUTA);
   const v = { giocatore: "Rossi", nome: "Franco", prezzo: 30 };
   assert.ok(contieneUna(ann, riempi(POOL.COMMENTI_RISICATI, v)), "margine di spareggio ignorato: " + ann);
 });
@@ -157,7 +160,7 @@ test("voce: margine risicato calcolato sull'ULTIMO spareggio (FIX #1): 20-20 poi
 test("voce: premio economico (p<10, margine largo) -> solo COMMENTI_ECONOMICI", () => {
   const { generaAnnuncio, POOL } = motoreFresco();
   const r = riv({ offerteInOrdine: [off("Dario", 3), off("Franco", 8)], vincitore: "Franco", importoFinale: 8 });
-  const ann = generaAnnuncio(r, () => 0.7);
+  const ann = generaAnnuncio(r, RNG_BATTUTA);
   const v = { giocatore: "Rossi", nome: "Franco", prezzo: 8 };
   assert.ok(contieneUna(ann, riempi(POOL.COMMENTI_ECONOMICI, v)), "manca commento economico: " + ann);
   assert.ok(!contieneUna(ann, riempi(POOL.COMMENTI_ALTI, v)), "commento alto indebito: " + ann);
@@ -167,7 +170,7 @@ test("voce: premio economico (p<10, margine largo) -> solo COMMENTI_ECONOMICI", 
 test("voce: fascia media (10-24, margine largo) -> solo COMMENTI_GENERALI", () => {
   const { generaAnnuncio, POOL } = motoreFresco();
   const r = riv({ offerteInOrdine: [off("Dario", 10), off("Franco", 15)], vincitore: "Franco", importoFinale: 15 });
-  const ann = generaAnnuncio(r, () => 0.7);
+  const ann = generaAnnuncio(r, RNG_BATTUTA);
   const v = { giocatore: "Rossi", nome: "Franco", prezzo: 15 };
   assert.ok(contieneUna(ann, riempi(POOL.COMMENTI_GENERALI, v)), "manca commento generale: " + ann);
   assert.ok(!contieneUna(ann, riempi(POOL.COMMENTI_ALTI, v)), "commento alto indebito: " + ann);
@@ -177,7 +180,7 @@ test("voce: fascia media (10-24, margine largo) -> solo COMMENTI_GENERALI", () =
 test("voce: offerta unica -> mai risicato (margine indefinito)", () => {
   const { generaAnnuncio, POOL } = motoreFresco();
   const r = riv({ offerteInOrdine: [off("Franco", 30)], passi: ["Anna", "Bob", "Carla"], vincitore: "Franco", importoFinale: 30 });
-  const ann = generaAnnuncio(r, () => 0.7);
+  const ann = generaAnnuncio(r, RNG_BATTUTA);
   const v = { giocatore: "Rossi", nome: "Franco", prezzo: 30 };
   assert.ok(!contieneUna(ann, riempi(POOL.COMMENTI_RISICATI, v)), "risicato indebito con offerta unica: " + ann);
   assert.ok(ann.includes("Tutti gli altri passano (3)"), "passi non menzionati con 1 offerta: " + ann);
@@ -222,7 +225,7 @@ test("voce: sorteggio — pareggio insuperabile, spareggio raccontato, suspense 
     spareggio: [off("Dario", 30), off("Franco", 30)],
     sorteggiato: true,
   });
-  const ann = generaAnnuncio(r, () => 0.7);
+  const ann = generaAnnuncio(r, RNG_BATTUTA);
   assert.ok(ann.includes("Pareggio insuperabile!"), "manca il pareggio insuperabile: " + ann);
   assert.ok(ann.includes("Franco") && ann.includes("30"), "vincitore/prezzo mancanti: " + ann);
   assert.ok(ann.includes("Pareggio! Si va allo spareggio."), "spareggio non raccontato: " + ann);
@@ -240,7 +243,7 @@ test("voce: sorteggio — pareggio insuperabile, spareggio raccontato, suspense 
 
 test("voce: non venduto a zero offerte — Nessuna offerta + commento dal pool", () => {
   const { generaAnnuncio, POOL } = motoreFresco();
-  const ann = generaAnnuncio(riv({ nonVenduto: true, motivoNonVenduto: "nessuna offerta", vincitore: null, importoFinale: 0 }), () => 0.7);
+  const ann = generaAnnuncio(riv({ nonVenduto: true, motivoNonVenduto: "nessuna offerta", vincitore: null, importoFinale: 0 }), RNG_BATTUTA);
   assert.ok(ann.includes("Nessuna offerta."), "manca 'Nessuna offerta.': " + ann);
   assert.ok(contieneUna(ann, POOL.COMMENTI_NON_VENDUTO.map((f) => f.trim())), "manca commento non venduto");
   assert.ok(ann.includes("resta svincolato"), "manca svincolato");
@@ -273,7 +276,7 @@ test("voce: non venduto per reparti pieni — 'Nessuno poteva offrire', senza pr
 test("voce: saltato dal banditore — annunciato il salto, senza prese in giro", () => {
   const { generaAnnuncio, POOL } = motoreFresco();
   const r = riv({ offerteInOrdine: [off("Dario", 12)], nonVenduto: true, motivoNonVenduto: "saltato dal banditore", vincitore: null, importoFinale: 0 });
-  const ann = generaAnnuncio(r, () => 0.7);
+  const ann = generaAnnuncio(r, RNG_BATTUTA);
   assert.ok(ann.includes("Il banditore salta."), "manca l'annuncio del salto: " + ann);
   assert.ok(!contieneUna(ann, POOL.COMMENTI_NON_VENDUTO.map((f) => f.trim())), "commento 'nessuno lo vuole' indebito: " + ann);
   assert.ok(ann.includes("resta svincolato"), "manca svincolato: " + ann);
@@ -346,4 +349,62 @@ test("voce: stesso seme, stesso annuncio (determinismo del rng iniettabile)", ()
   const b = motoreFresco().generaAnnuncio(r, rngConSeme(4242));
   assert.strictEqual(a, b);
   assert.notStrictEqual(a, motoreFresco().generaAnnuncio(r, rngConSeme(9999)));
+});
+
+// ------------------------------------------------------------ battute: quantità e interruttore (10/09)
+
+// tutti i commenti possibili RIEMPITI coi valori del round: serve a rilevare
+// se in un annuncio c'è UNA QUALSIASI battuta
+function frasiBattuta(POOL, v) {
+  return riempi([
+    ...POOL.COMMENTI_ALTI, ...POOL.COMMENTI_ECONOMICI,
+    ...POOL.COMMENTI_RISICATI, ...POOL.COMMENTI_GENERALI,
+  ], v);
+}
+
+test("voce: battute DISATTIVATE — risultato completo con suspense, zero commenti", () => {
+  const { generaAnnuncio, POOL } = motoreFresco();
+  const r = riv({ offerteInOrdine: [off("Dario", 10), off("Franco", 44)], vincitore: "Franco", importoFinale: 44 });
+  // la suspense dipende dalla struttura estratta (0/2 la prevedono): deve
+  // comparire in PARTE dei seed - non in tutti - e mai sparire del tutto
+  let conSuspense = 0;
+  for (let seme = 1; seme <= 80; seme++) {
+    const ann = generaAnnuncio(r, rngConSeme(seme), { battute: false });
+    assert.ok(ann.includes("Rossi") && ann.includes("Franco") && ann.includes("44"), "giocatore/vincitore/prezzo sempre detti: " + ann);
+    if (contieneUna(ann, POOL.SUSPENSE.map((f) => f.trim()))) conSuspense++;
+    const v = { giocatore: "Rossi", nome: "Franco", prezzo: 44 };
+    for (const f of frasiBattuta(POOL, v)) assert.ok(!ann.includes(f), "battuta indebita con battute=false: " + f + " in " + ann);
+  }
+  assert.ok(conSuspense >= 15, "la suspense sopravvive senza battute (vista in " + conSuspense + "/80 seed)");
+  // anche il non venduto resta informativo, senza prese in giro
+  const nv = generaAnnuncio(riv({ nonVenduto: true, motivoNonVenduto: "nessuna offerta", passi: ["Anna"], vincitore: null, importoFinale: 0 }), RNG_BATTUTA, { battute: false });
+  assert.ok(nv.includes("Hanno passato tutti") && nv.includes("resta svincolato"), "non venduto informativo senza battute: " + nv);
+  assert.ok(!contieneUna(nv, POOL.COMMENTI_NON_VENDUTO.map((f) => f.trim())), "presa in giro indebita con battute=false: " + nv);
+});
+
+test("voce: frequenza battute — una su cinque normale, quasi una su due per i costosi", () => {
+  const { generaAnnuncio, POOL, PROB_BATTUTA, PROB_BATTUTA_ALTA } = motoreFresco();
+  assert.ok(Math.abs(PROB_BATTUTA - 0.20) < 0.001, "probabilità base = 1/5");
+  assert.ok(PROB_BATTUTA_ALTA > PROB_BATTUTA * 1.5, "i costosi ridono molto più spesso");
+  const conta = (prezzo, seme) => {
+    const r = riv({ offerteInOrdine: [off("Dario", Math.max(1, prezzo - 9)), off("Franco", prezzo)], vincitore: "Franco", importoFinale: prezzo });
+    const v = { giocatore: "Rossi", nome: "Franco", prezzo };
+    const rng = rngConSeme(seme);
+    let conBattuta = 0;
+    for (let i = 0; i < 1500; i++) if (contieneUna(generaAnnuncio(r, rng), frasiBattuta(POOL, v))) conBattuta++;
+    return conBattuta / 1500;
+  };
+  const freqMedia = conta(15, 20260910);   // 10-24 FMM: fascia media
+  const freqAlta = conta(44, 20260910);    // ≥25 FMM: premio alto
+  assert.ok(freqMedia > 0.10 && freqMedia < 0.30, "fascia media ~1/5, misurato " + freqMedia.toFixed(3));
+  assert.ok(freqAlta > freqMedia + 0.10, "i costosi ridono molto di più: " + freqAlta.toFixed(3) + " vs " + freqMedia.toFixed(3));
+  assert.ok(freqAlta < 0.60, "nemmeno i costosi ridono sempre: " + freqAlta.toFixed(3));
+});
+
+test("voce: non venduto con reparto CHIUSO dal banditore — annuncio secco, senza prese in giro", () => {
+  const { generaAnnuncio, POOL } = motoreFresco();
+  const ann = generaAnnuncio(riv({ nonVenduto: true, motivoNonVenduto: "reparto chiuso dal banditore", vincitore: null, importoFinale: 0 }), RNG_BATTUTA);
+  assert.ok(ann.includes("Reparto chiuso dal banditore."), "manca l'annuncio del reparto chiuso: " + ann);
+  assert.ok(ann.includes("resta svincolato"), "manca svincolato: " + ann);
+  assert.ok(!contieneUna(ann, POOL.COMMENTI_NON_VENDUTO.map((f) => f.trim())), "presa in giro indebita su chiusura reparto: " + ann);
 });

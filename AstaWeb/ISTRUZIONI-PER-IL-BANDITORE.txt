@@ -1,5 +1,5 @@
-ASTA BUSTA CHIUSA — ISTRUZIONI PER IL BANDITORE
-=================================================
+FANTASTA - ASTA REALTIME - ISTRUZIONI PER IL BANDITORE
+=======================================================
 
 COSA TI SERVE (una volta sola)
 -----------------------------
@@ -66,12 +66,31 @@ LA SERA DELL'ASTA (2 minuti)
    la propria offerta segreta (0 = passo). Quando hanno consegnato tutti - o tu premi
    "CHIUDI ORA" (i ritardatari fanno passo) - il computer ANNUNCIA A VOCE i 4 punteggi
    più alti e il vincitore. Tasto "PROSSIMO" per il giocatore dopo.
-   Pulsanti extra: SPARA (salta un giocatore), SQUADRE (rose aggiornate),
-   TERMINA (a fine serata, con scarico CSV delle squadre).
+   Pulsanti extra: CHIUDI ORA, SALTA (salta il giocatore), CHIUDI REPARTO
+   (termina le aste del reparto: chi resta e' svincolato e si passa al reparto
+   dopo), SQUADRE (rose aggiornate con spesi per reparto + ANCORA LIBERI),
+   TERMINA (a fine serata). Quando un reparto e' pieno per tutti, i giocatori
+   rimasti si svincolano da soli: niente giri a vuoto.
+
+LE BATUTE (decidi tu, anche durante la serata)
+----------------------------------------------
+Nella barra "Voce" c'e' la casella "Battute": acceso (default) il banditore
+scherza UNA VOLTA SU CINQUE (piu' spesso solo per i giocatori costosi);
+spento dice solo il risultato delle aste, con la stessa suspance.
+Le ultime due buste di ogni asta si aprono PIU' LENTE, insieme:
+la suspance e' tutta lì. E i crediti delle rose si aggiornano solo
+DOPO la proclamazione: nessuno scopre il vincitore in anticipo.
+
+I FILE DELLA SERATA
+-------------------
+A fine asta, dalla schermata finale: "SCARICA EXCEL COMPLETO" (5 fogli:
+squadre, riepilogo, asta completa, analisi, svincolati) e "SCARICA TUTTE
+LE OFFERTE" (ogni busta di ogni giocatore, ordinata, con esito).
 
 IMPORTANTE
 ----------
-- Se riavvii il computer, l'asta riprende da dove era: riapri avvia-asta.bat.
+- Se riavvii il computer - o salta la luce - l'asta riprende da dove era:
+  riapri avvia-asta.bat (ogni mossa e' salvata su disco all'istante).
 - Per ripartire da zero: pulsante "Nuova asta" nella pagina del banditore.
 
 SE C'E' UN PARTECIPANTE REMOTO (da casa sua)

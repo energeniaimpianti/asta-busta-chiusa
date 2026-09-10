@@ -1,4 +1,4 @@
-# Asta Busta Chiusa — asta fantacalcio a buste chiuse
+# FantAsta · Asta Realtime — asta fantacalcio a buste chiuse
 
 Progetto personale di Giovanni D'Argento: asta del fantacalcio per **8 partecipanti + 1 banditore**, a **buste chiuse** (offerte segrete simultanee) con **annuncio a voce dei 4 punteggi più alti** e vincitore.
 
@@ -6,14 +6,14 @@ Due prodotti gemelli, stesso motore di regole (portato e ri-collaudato nei due l
 
 | Componente | Cos'è | Collaudo |
 |---|---|---|
-| **`AstaWeb/`** | Edizione **multi-dispositivo**: il banditore avvia il server sul pc (doppio click su `avvia-asta.bat`, serve Node.js), i partecipanti puntano **dal browser del proprio telefono** via QR sulla Wi-Fi locale. Voce dal pc del banditore. | `AstaWeb/prova-tutto.bat` (o `node --test`) |
+| **`AstaWeb/`** | Edizione **multi-dispositivo** (quella usata alla serata vera): il banditore avvia il server sul pc (doppio click su `AVVIA-ASTA.bat`, serve Node.js), i partecipanti puntano **dal browser del proprio telefono** col link https del tunnel. Voce dal dispositivo del banditore. | `AstaWeb/prova-tutto.bat` (o `node --test`) |
 | **`AstaChiusa/`** | App **Android** (Kotlin + Compose), piano "passa-il-telefono": un solo telefono, APK installabile. | `AstaChiusa/prova-core.bat` |
 
-Pronto anche il **listone ufficiale 2026/27** (`AstaWeb/liste/lista-seriea-2026-27.xlsx`): 228 giocatori con nomi/ruoli/quotazioni del listone ufficiale Fantacalcio.it (fonte Sky TG24 05/08/2026), verificato con i parser di entrambi i prodotti.
+**Listone definitivo 2026/27** (`AstaWeb/liste/listone_2026-27_asta.xlsx` e `.csv`): 579 giocatori con nomi/ruoli/squadre/quotazioni, **portieri a blocchi di tre della stessa squadra** (regola della lega).
 
 ## Regole
 
-La specifica completa con tutti i default è in **`SPEC.md`**: quote 3 P / 8 D / 8 C / 6 A, ordine reparti A→C→P→D, budget 500 FMM, regola del resto, spareggi da pari+1, chiusura automatica quando tutti gli idonei hanno consegnato (o forzata dal banditore), squadre salvate a ogni aggiudicazione, annuncio vocale dei soli 4 punteggi più alti (regola del 27/08/2026).
+La specifica completa con tutti i default è in **`SPEC.md`**: quote 3 P / 8 D / 8 C / 6 A (rosa 25), ordine reparti A→C→P→D, budget 1500 FMM, regola del resto, spareggio ad oltranza con monetina/pesca, chiusura del reparto da parte del banditore, rivelazione "a poker" con le ultime due buste rallentate e crediti che si aggiornano solo dopo la proclamazione, battute una su cinque (più sui costosi) spegnibili, autosave atomico anti-blackout, Excel 5 fogli + file offerte ordinato.
 
 ## Collaudo
 

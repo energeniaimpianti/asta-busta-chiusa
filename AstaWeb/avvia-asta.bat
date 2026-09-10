@@ -1,10 +1,10 @@
 @echo off
-title ASTA BUSTA CHIUSA (NON CHIUDERE QUESTA FINESTRA)
+title FANTASTA ASTA REALTIME (NON CHIUDERE QUESTA FINESTRA)
 cd /d "%~dp0server"
 
 echo.
 echo  ============================================
-echo   ASTA BUSTA CHIUSA - avvio in corso...
+echo   FANTASTA ASTA REALTIME - avvio in corso...
 echo  ============================================
 echo.
 
@@ -60,7 +60,7 @@ start "" http://localhost:8090/banditore
 echo.
 echo  ============================================================
 echo.
-echo    ASTA BUSTA CHIUSA
+echo    FANTASTA ASTA REALTIME
 echo.
 echo    PIN BANDITORE:  %PIN%
 echo    (inseriscilo nella pagina del browser che si e' aperta)

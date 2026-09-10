@@ -57,6 +57,8 @@ const SUSPENSE = [
   "Silenzio in sala...",
   "Si decide adesso...",
   "Un attimo, ci siamo...",
+  "Il momento che tutti aspettano...",
+  "Occhio al verdetto...",
 ];
 
 // Verdetto completo: deve sempre dire giocatore, vincitore e prezzo.
@@ -108,6 +110,19 @@ const COMMENTI_ALTI = [
   "Bottoni! {n} da qui in poi gioca coi bottoni!",
   "Ma sono fantamilioni o euro veri?! {n} sta sudando!",
   "Il ragioniere di {n} è già svenuto!",
+  "Al banditore trema il polso: {p} fantamilioni!",
+  "Con {p} si comprava la curva, non il giocatore!",
+  "{n} ha pagato pure l'IVA!",
+  "Quanto l'ha pagato?! Manco un campione agli esordi!",
+  "Scontrino da {p} fantamilioni: da incorniciare!",
+  "Se {g} non segna subito, {n} cambia hobby!",
+  "Prezzo da gala: almeno garantiscano lo champagne!",
+  "Il portafoglio di {n} ha chiesto le ferie!",
+  "Spende {n}, spende: i fantamilioni non si contano più!",
+  "Un'asta così si vede una volta a stagione: pagare così, speriamo!",
+  "Ma l'ha comprato o l'ha rapito?! {p} fantamilioni di riscatto!",
+  "Il Fantasanta con {g} farà i milioni... di {n}!",
+  "Per {p} fantamilioni voglio almeno il rumore della rete a ogni partita!",
 ];
 
 // ---- PREMI ECONOMICI (<10 FMM, margine largo): SOLO tema affare.
@@ -125,6 +140,14 @@ const COMMENTI_ECONOMICI = [
   "Altri due così e {n} completa la squadra!",
   "Ma il prezzo è in fantamilioni o nei punti del supermercato?!",
   "Bilancio in ordine: {n} compra forte e spende poco!",
+  "L'ha pagato meno di un caffè al bar dello stadio!",
+  "Prezzo dell'usato... garantito!",
+  "Due calci e una maglietta: {g} praticamente gratis!",
+  "L'affare del secolo! Se segna, ovviamente.",
+  "Manco il biglietto della metro costa così poco!",
+  "Svendita totale: {n} ringrazia e porta a casa!",
+  "Prezzo stracciato: al prossimo giro alzano tutti!",
+  "Chi lascia {g} a {p} fantamilioni? Un ladro, ecco chi!",
 ];
 
 // ---- VITTORIE RISICATE (margine 1-3 FMM sul round decisivo): SOLO vittoria
@@ -145,6 +168,14 @@ const COMMENTI_RISICATI = [
   "La differenza l'ha fatta l'ultimo rilancio!",
   "Sul filo di lana! Ci voleva il rallentatore!",
   "Un soffio, un battito di ciglia: la sfida era questa!",
+  "Vinto per un punto: come ai rigori!",
+  "Un fantamilione di scarto e via: roba da fotofinish!",
+  "Si è salvato per un pelo, gli altri ancora sognano quel rilancio!",
+  "Chi ha perso stanotte si sveglia ancora col pensiero!",
+  "Paura fino all'ultimo secondo: questo è il fantacalcio!",
+  "Quel fantamilione in più valeva oro!",
+  "Margine minimo, batticuore massimo!",
+  "Gol di rapina all'ultimo minuto!",
 ];
 
 // ---- GENERALI (fascia media 10-24 FMM, margine largo): NEUTRI sul prezzo.
@@ -182,6 +213,20 @@ const COMMENTI_GENERALI = [
   "Battute di mano per {g}: benvenuto in squadra!",
   "Pochi lo conoscevano, ma {n} ha fatto i compiti a casa!",
   "Un acquisto che farà discutere! Bene: il fantacalcio vive di discussioni!",
+  "Il Fantasanta prende appunti anche stasera!",
+  "La lavagna di {n} funziona a istinto!",
+  "Acquisto da catalogo: affidabile e senza sorprese!",
+  "Nessuno se l'aspettava... e invece eccolo qui!",
+  "Il mister {n} sorride: o è contento o ha sbagliato!",
+  "Piazza che corre: {g} trova la squadra!",
+  "Quest'anno la sorpresa si chiama {g}!",
+  "Gli scout di {n} non dormono mai!",
+  "Un nome solido per la rosa di {n}!",
+  "Il campionato è lungo: servono uomini, non solo campioni!",
+  "Acquisto ragionato! O almeno così risulta dai registri!",
+  "La maglia se la merita: il posto se lo deve guadagnare!",
+  "In rosa c'è posto per tutti: per {g} c'era giusto quello!",
+  "Anche gli avversari volevano {g}: stasera dormono male!",
 ];
 
 // ---- NON VENDUTO: usate SOLO a zero offerte (nessuno ha voluto davvero il
@@ -198,6 +243,10 @@ const COMMENTI_NON_VENDUTO = [
   "Passato alla storia: passato e basta!",
   "Neanche un'offerta di cortesia!",
   "Il bancone è la sua nuova casa!",
+  "Nemmeno un fischio!",
+  "Sala vuota per lui!",
+  "Busta chiusa... per sempre!",
+  "Manco mezza offerta simbolica!",
 ];
 
 // ============================================================ UTILITÀ
@@ -237,10 +286,18 @@ function _spareggioNarrabile(r) {
 
 // ============================================================ MOTORE
 
-function generaAnnuncio(r, rng) {
+// Frequenza delle battute (richiesta di Giovanni, 10/09/2026): una su cinque in
+// generale; per i giocatori COSTOSI (≥25 FMM) più spesso. Con battute=false il
+// banditore ottiene comunque il risultato dell'asta CON la suspense (letture,
+// pause e verdetto restano): spariscono solo i commenti.
+const PROB_BATTUTA = 0.20;
+const PROB_BATTUTA_ALTA = 0.45;
+
+function generaAnnuncio(r, rng, opzioni) {
+  const battute = !opzioni || opzioni.battute !== false;
   if (r.sorteggiato && r.vincitore) return generaSorteggio(r, rng);
-  if (r.nonVenduto) return generaNonVenduto(r, rng);
-  return generaAggiudicazione(r, rng);
+  if (r.nonVenduto) return generaNonVenduto(r, rng, battute);
+  return generaAggiudicazione(r, rng, battute);
 }
 
 // sorteggio: i due finalisti hanno offerto LO STESSO importo, ha deciso la
@@ -280,7 +337,7 @@ function generaSorteggio(r, rng) {
   return t;
 }
 
-function generaNonVenduto(r, rng) {
+function generaNonVenduto(r, rng, battute) {
   const rnd = rng || Math.random;
   const g = r.giocatore.nome;
   const motivo = r.motivoNonVenduto || "nessuna offerta";
@@ -295,6 +352,9 @@ function generaNonVenduto(r, rng) {
     if (r.offerteInOrdine.length > 0) t = _legge(t, r.offerteInOrdine.slice(-_n(3, 4, rnd)), rnd);
     return t + `Il banditore salta. ${g} resta svincolato.`;
   }
+  if (motivo.includes("reparto chiuso")) {
+    return t + `Reparto chiuso dal banditore. ${g} resta svincolato.`;
+  }
 
   if (r.offerteInOrdine.length > 0) {
     t = _legge(t, r.offerteInOrdine.slice(-_n(3, 4, rnd)), rnd);
@@ -304,13 +364,14 @@ function generaNonVenduto(r, rng) {
   } else {
     t += "Nessuna offerta. ";
   }
-  t += _pick(COMMENTI_NON_VENDUTO, "nv", rnd) + " ";
+  // battuta solo una volta su cinque (e mai con battute disattivate)
+  if (battute && rnd() < PROB_BATTUTA) t += _pick(COMMENTI_NON_VENDUTO, "nv", rnd) + " ";
   // provvisorio: il giocatore torna in coda e verrà richiamato a fine reparto
   t += r.provvisorio ? `${g} torna in coda: lo richiamiamo a fine reparto.` : `${g} resta svincolato.`;
   return t;
 }
 
-function generaAggiudicazione(r, rng) {
+function generaAggiudicazione(r, rng, battute) {
   const rnd = rng || Math.random;
   const g = r.giocatore.nome, n = r.vincitore, p = r.importoFinale;
   const alto = p >= 25, economico = p < 10;
@@ -324,6 +385,9 @@ function generaAggiudicazione(r, rng) {
   const risicato = margine >= 1 && margine <= 3;
 
   const struttura = Math.floor(rnd() * 5);
+  // la battuta: una su cinque, più spesso per i premi alti (≥25 FMM); con
+  // battute=false si dice comunque TUTTO il risultato (le battute spariscono, 10/09)
+  const conBattuta = battute && rnd() < (alto ? PROB_BATTUTA_ALTA : PROB_BATTUTA);
   let t = _tmpl(_pick(APERTURE, "ap", rnd), { giocatore: g }) + " ";
 
   // se c'è stato lo spareggio la voce NON ripete l'asta iniziale: si racconta
@@ -376,7 +440,7 @@ function generaAggiudicazione(r, rng) {
       break;
     case 3:
       t += _tmpl(_pick(AGGIUDICAZIONI, "ag", rnd), { giocatore: g, nome: n, prezzo: p }) + " ";
-      t += commentiPer(n, g, p);
+      if (conBattuta) t += commentiPer(n, g, p);
       break;
     case 4:
       // TELEGRAFICA: aggiudicazione secca, senza ripetere il giocatore
@@ -385,7 +449,8 @@ function generaAggiudicazione(r, rng) {
       break;
   }
 
-  if (struttura !== 3 && struttura !== 4 && rnd() < 0.4) {
+  // la telegrafica (4) resta secca anche con la battuta: è il suo carattere
+  if (struttura !== 3 && struttura !== 4 && conBattuta) {
     t += " ";
     t += commentiPer(n, g, p);
   }
@@ -393,4 +458,7 @@ function generaAggiudicazione(r, rng) {
   return t;
 }
 
-module.exports = { generaAnnuncio, POOL: { APERTURE, LETTURE, SUSPENSE, AGGIUDICAZIONI, AGGIUDICAZIONI_INTEGRATE, COMMENTI_ALTI, COMMENTI_ECONOMICI, COMMENTI_RISICATI, COMMENTI_GENERALI, COMMENTI_NON_VENDUTO } };
+module.exports = {
+  generaAnnuncio, PROB_BATTUTA, PROB_BATTUTA_ALTA,
+  POOL: { APERTURE, LETTURE, SUSPENSE, AGGIUDICAZIONI, AGGIUDICAZIONI_INTEGRATE, COMMENTI_ALTI, COMMENTI_ECONOMICI, COMMENTI_RISICATI, COMMENTI_GENERALI, COMMENTI_NON_VENDUTO },
+};

@@ -1,6 +1,6 @@
 @echo off
 rem ============================================================
-rem  PROVA TUTTO (test di riva automatici) - Asta Busta Chiusa
+rem  PROVA TUTTO (test di riva automatici) - FantAsta Asta Realtime
 rem  Doppio click: esegue la suite completa dei test del server
 rem  web (motore, parser Excel/CSV, robustezza, listone ufficiale).
 rem  Esito atteso in fondo: "fail 0".
